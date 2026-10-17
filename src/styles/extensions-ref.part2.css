@@ -1,0 +1,555 @@
+/* ── Flat management list (09.40.15 language) ── */
+.ext-ref-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
+}
+
+.ext-ref-row {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.1));
+  background: transparent;
+}
+
+.ext-ref-row:last-child {
+  border-bottom: 0;
+}
+
+.ext-ref-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  min-height: 56px;
+  min-width: 0;
+}
+
+.ext-ref-row__icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+}
+
+.ext-ref-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ext-ref-row__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.ext-ref-row__title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/** Compact scope tag after skill name — project only (global untagged). */
+.skill-scope-tag {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-scope-tag--project {
+  color: var(--accent, var(--text-secondary));
+  opacity: 0.9;
+}
+
+.ext-ref-row__desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-ref-row__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.ext-ref-row__end {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ext-ref-row__chev,
+.ext-ref-gear {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.ext-ref-row__chev:hover,
+.ext-ref-gear:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+}
+
+.ext-ref-row__chev.is-open {
+  transform: rotate(180deg);
+}
+
+.ext-ref-gear:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ext-ref-row__expand {
+  padding: 0 14px 12px 62px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ext-ref-row--off .ext-ref-row__title {
+  opacity: 0.72;
+}
+
+.ext-ref-row--dense .ext-ref-row__main {
+  min-height: 48px;
+  padding: 10px 12px;
+}
+
+.ext-ref-row--dense .ext-ref-row__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.ext-ref-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--text-secondary);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-ref-empty {
+  margin: 0;
+  padding: 14px 4px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+/* Filters under installed */
+.ext-ref-block .ext-plugin-filters {
+  margin: 0;
+  padding: 0 2px;
+}
+
+/* Advanced install flat */
+.ext-ref-advanced {
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+  border-radius: 12px;
+  padding: 0;
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+  overflow: hidden;
+}
+
+.ext-ref-advanced > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.ext-ref-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ext-ref-advanced[open] > summary {
+  border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.1));
+  color: var(--text-primary);
+}
+
+.ext-ref-advanced > .ext-ref-section-label {
+  padding: 12px 14px 0;
+  margin: 0;
+}
+
+.ext-ref-advanced .ext-plugin-install {
+  padding: 8px 14px 14px;
+  margin: 0;
+  border-bottom: 0;
+}
+
+.ext-plugin-install__lead {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.ext-plugin-install__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ext-plugin-install__input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.ext-plugin-install__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.ext-plugin-install__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger, #e05a5a);
+}
+
+.ext-plugin-install .ext-plugin-result--inline {
+  margin-top: 4px;
+  gap: 6px;
+}
+
+/* ── Embedded installable catalog (kill second page chrome) ── */
+.ext-ref-catalog.ext-ref-catalog--embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .settings-page__h2 {
+  display: none !important;
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-card {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-market-browse {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-market-browse__search {
+  display: none; /* tab-level search covers plugins */
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-list.ext-market-browse__list {
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-item {
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.1));
+  padding: 12px 14px;
+  background: transparent;
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-item:last-child {
+  border-bottom: 0;
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-item__actions {
+  flex-wrap: wrap;
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-market-sources {
+  margin-top: 8px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+}
+
+.ext-ref-catalog.ext-ref-catalog--embedded .ext-market-sources__summary {
+  padding: 10px 14px;
+}
+
+
+
+/* ── Skills / MCP / Agents: flat under shell ── */
+.ext-ref-shell .settings-page__h2 {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ext-ref-shell .ext-card {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+/* Prefer ext-ref-list over nested card list chrome when both present */
+.ext-ref-shell .ext-card > .ext-ref-list,
+.ext-ref-shell .ext-card > .ext-ref-block {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ext-ref-shell .ext-card > .ext-empty,
+.ext-ref-shell .ext-card > .ext-ref-empty {
+  padding: 16px 14px;
+}
+
+.ext-ref-shell .ext-card > .ext-ref-section,
+.ext-ref-shell .ext-card > .ext-ref-block {
+  padding: 12px 12px 14px;
+  gap: 8px;
+}
+
+.ext-ref-shell .ext-card > .ext-ref-section + .ext-ref-section,
+.ext-ref-shell .ext-card > .ext-ref-block + .ext-ref-block {
+  border-top: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.1));
+  padding-top: 14px;
+}
+
+/* Agents / Hooks lists inside shell */
+.ext-ref-shell .ext-list {
+  margin: 0;
+  padding: 0;
+}
+
+.ext-ref-shell .ext-item {
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.1));
+  padding: 12px 14px;
+  background: transparent;
+}
+
+.ext-ref-shell .ext-item:last-child {
+  border-bottom: 0;
+}
+
+/* Alerts keep breathing room */
+.ext-ref-shell > .ext-alert {
+  margin: 0 0 14px;
+}
+
+/* Validate inline under row — no absolute weirdness */
+.ext-ref-row .ext-item__validate {
+  margin: 0 14px 12px 62px;
+}
+
+/* ── Agents / Hooks: section hierarchy ── */
+.ext-ref-toolbar {
+  align-items: center;
+  gap: 10px 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ext-ref-toolbar__intro {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.ext-ref-toolbar .ext-ref-block__lead {
+  padding: 0;
+  max-width: 52rem;
+}
+
+/* Directory open/create groups */
+.ext-ref-dir-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 0 2px;
+}
+
+.ext-ref-dir-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 200px;
+  max-width: 360px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
+}
+
+.ext-ref-dir-group__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.ext-ref-dir-group__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ext-ref-pathline {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.ext-ref-code {
+  font-size: 11px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  word-break: break-all;
+}
+
+/* Scope subgroups under a section */
+.ext-ref-scope-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ext-ref-scope-group + .ext-ref-scope-group {
+  margin-top: 6px;
+}
+
+.ext-ref-scope-group__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Hooks try-run inside ext-ref-advanced */
+.ext-ref-shell .ext-hooks-try.ext-ref-advanced {
+  margin: 0;
+}
+
+.ext-ref-shell .ext-hooks-try .ext-hooks-try__body {
+  padding: 12px 14px 14px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ext-ref-shell .ext-hooks-try__field--timeout {
+  flex: 0 0 120px;
+  max-width: 140px;
+}
+
+.ext-ref-shell .ext-hooks-try__row {
+  align-items: flex-end;
+}
+
+.ext-ref-shell .ext-hooks-try__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ext-ref-shell .ext-hooks-activity {
+  margin: 0;
+}
+
+.ext-ref-shell .ext-hooks-activity__chips {
+  margin: 0;
+}
+
+.ext-ref-shell .ext-hooks-activity__detail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

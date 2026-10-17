@@ -1,0 +1,899 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  /* Transparent window chrome still ok; paint solid via .app-shell */
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  /* Light wallpaper + color-scheme:light otherwise paints native
+   * rounded-rect tiles on compact chrome (search, workspace chip). */
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Image lightbox must sit above GlassModal (.overlay = 12000) and Select (13000) */
+.yarl__portal {
+  z-index: 14000 !important;
+}
+
+/*
+ * Lightbox images: fill the stage with object-fit contain.
+ * YARL defaults only set max-width/max-height to natural px, so small images
+ * stay tiny; ImageViewer also sets logical width/height + imageProps — this
+ * CSS is the durable fallback if props are stripped.
+ */
+.yarl__slide_image {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Avoid browser native image drag interfering with zoom pan. */
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.image-original-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(400px, calc(100vw - 224px));
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.image-original-status > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.image-original-status > button {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+}
+
+.image-original-status > button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -4px;
+}
+
+/* Zoomed past fit: drag to pan (YARL adds this class when zoom > 1). */
+.yarl__slide_wrapper_interactive {
+  cursor: grab;
+}
+
+.yarl__slide_wrapper_interactive:active {
+  cursor: grabbing;
+}
+
+.yarl__slide_wrapper_interactive .yarl__slide_image {
+  cursor: grab;
+}
+
+.yarl__slide_wrapper_interactive:active .yarl__slide_image {
+  cursor: grabbing;
+}
+
+/* ── Codex-style tip (replaces native title= tooltips) ──
+ * Opaque pill. Do not use 0.5px border on position:fixed: WKWebView
+ * rasterizes that stroke as a square around the radius (Safari rounded-
+ * border bugs). 0-blur 1px spread follows the radius. */
+.ui-tip {
+  position: fixed;
+  /* Top band. A tip annotates a control that can live in any surface — floating
+     menu (13000), space switcher menu (14000), GlassModal `.overlay` (12000),
+     `.app-dialog-overlay` / toast (14000) — and it is portaled to body, so DOM
+     order cannot put it on top: only the layer can. At 10050 a tip on a row
+     inside the branch menu painted behind the open menu (watch-bell tooltip).
+     Raise this above everything a tip can be anchored in, never down. */
+  z-index: 14100;
+  /* Inline style also sets maxWidth from viewport clamp; keep a CSS fallback. */
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: none;
+  box-shadow: 0 0 0 1px var(--glass-border);
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  /* top/left are the box origin (no translate); viewport clamp in tooltip.tsx */
+  box-sizing: border-box;
+}
+
+/* Hover label above a chip — no shadow, so it does not read as selected. */
+.ui-tip--flat {
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Settings help: longer descriptions wrap instead of ellipsizing */
+.ui-tip--wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 8px 10px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+
+/* File-path card hover: full path, wrap, show immediately (delayMs=0). */
+.ui-tip--path {
+  max-width: min(520px, calc(100vw - 16px));
+  max-height: min(240px, 40vh);
+  overflow: hidden;
+  padding: 6px 8px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* JSON Schema full text on active chip tip */
+.ui-tip--mono {
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: min(240px, 40vh);
+  overflow: hidden;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lobe-chat-action.is-copied {
+  color: var(--success, #3ecf8e);
+}
+
+/* Global: no focus outline rings — chrome uses hover / active instead */
+:focus,
+:focus-visible {
+  outline: none;
+}
+
+/* Screen-reader only (T15 live regions / labels) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Keyboard focus for permission / ask-user (no global outline, but visible here) */
+.perm-bar__btn:focus-visible,
+.ask-user-bar--collapsed:focus-visible,
+.ask-user-bar__minimize:focus-visible,
+.modal-actions .btn:focus-visible,
+.modal-close:focus-visible {
+  outline: 2px solid var(--border-focus, #6b8cff);
+  outline-offset: 2px;
+}
+
+/* Composer textarea: no focus ring / border flash (Codex-like quiet field) */
+textarea:focus-visible,
+.composer__input:focus,
+.composer__input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /*
+   * macOS: keep transparent so native Sidebar vibrancy + CSS sidebar blur
+   * show through. Win/other paint solid via .platform-win rules below.
+   */
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: var(--radius-window);
+  overflow: hidden;
+  position: relative;
+  /* UI chrome is not selectable; opt back in for chat + resource preview */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Tauri window drag regions.
+ * Hosts use `data-tauri-drag-region="deep"` so drag.js can start_dragging
+ * (#1075). Keep compositor caption drag too: WebView2 covers the client,
+ * so parent WM_NCHITTEST never sees titlebar clicks. */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* Interactive controls inside drag regions stay clickable.
+ * Composer / chat must stay no-drag so Windows file drops are not
+ * swallowed as window-move. */
+button,
+a,
+input,
+textarea,
+select,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+[contenteditable="true"],
+.composer-wrap,
+.composer,
+.perm-bar,
+.ask-user-bar,
+.overlay,
+.modal,
+.lobe-chat,
+.chat-surface {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Chat transcript (messages / reasoning / tools) may be copied */
+.chat-surface,
+.chat-surface *,
+.lobe-chat,
+.lobe-chat * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Right resource panel: only the preview body, not tree / chrome */
+.rp-preview-body,
+.rp-preview-body *,
+.rp-preview-office,
+.rp-preview-office *,
+.rp-preview-code-host,
+.rp-preview-code-host *,
+.rp-code,
+.rp-code * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Keep line-number gutter non-selectable while code body is */
+.rp-code__gutter,
+.rp-code__gutter * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Form fields always need selection for edit/copy */
+.app-shell input,
+.app-shell textarea,
+.app-shell [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Win / frameless self-drawn chrome (mac uses Overlay traffic lights) */
+/* Top 8px: Linux/other keep a no-drag strip. Windows lets compositor caption
+   cover the client titlebar; tao already maps the non-client shadow to HTTOP. */
+.window-edge-n {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: var(--window-controls-inset, 138px);
+  height: 8px;
+  z-index: 10039;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  pointer-events: auto;
+}
+
+.platform-win .window-edge-n,
+.platform-linux .window-edge-n,
+.platform-other .window-edge-n,
+.has-custom-chrome .window-edge-n {
+  display: block;
+}
+
+html.platform-win .window-edge-n {
+  pointer-events: none;
+}
+
+.window-controls {
+  display: none;
+  align-items: stretch;
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 10040;
+  height: var(--titlebar-height, 40px);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.platform-win .window-controls,
+.platform-linux .window-controls,
+.platform-other .window-controls,
+.has-custom-chrome .window-controls {
+  display: flex;
+}
+
+.window-controls__btn {
+  width: 46px;
+  height: var(--titlebar-height, 40px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: 0;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.window-controls__btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.window-controls__btn--close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/*
+ * Solid shell on Windows / non-mac (no native vibrancy).
+ * mac keeps transparent shell so NSVisualEffectMaterial::Sidebar shows through.
+ */
+.platform-win .app-shell,
+.platform-other .app-shell,
+.has-custom-chrome.app-shell {
+  background: var(--bg-app);
+  /* Frameless opaque windows are square — the CSS 12px radius above would
+     leave dark corner wedges between the inner radius and the square window
+     edge (webview background shows through). Square corners match the
+     window; macOS keeps the radius because its window is transparent. */
+  border-radius: 0;
+}
+
+.platform-win .workbench,
+.platform-other .workbench,
+.has-custom-chrome .workbench {
+  background: var(--bg-app);
+}
+
+.platform-win .sidebar,
+.platform-linux .sidebar,
+.platform-other .sidebar,
+.has-custom-chrome .sidebar {
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Maximized: square corners */
+.app-shell.is-maximized,
+.app-shell.is-maximized .sidebar {
+  border-radius: 0 !important;
+}
+
+.workbench {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  z-index: 0;
+  /* Transparent on mac so sidebar vibrancy is not covered by solid paint */
+  background: transparent;
+  /* Do not transition opacity: a parent opacity group flattens the glass
+   * rail with the solid chat column, and WKWebView keeps that flatten after
+   * settings closes — sidebar frost then matches .main. */
+  transition: --sw-sidebar-occupied var(--motion-pane) var(--motion-pane-ease);
+}
+
+.workbench:has(.sidebar.is-resizing) {
+  transition: none;
+}
+
+/*
+ * Left sidebar — frosted glass rail.
+ * mac: native Sidebar vibrancy + translucent CSS tint (one material layer).
+ * Light: airy white glass + soft inward edge shade (ChatGPT-style).
+ * Win: solid via .platform-win .sidebar.
+ */
+.sidebar {
+  position: relative;
+  /* Default size; open desktop rail overrides via inline width from layout prefs */
+  width: 268px;
+  min-width: 0;
+  max-width: none;
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  /* No outer padding — chrome / brand / scroll / footer own their insets */
+  padding: 0;
+  gap: 0;
+  /*
+   * Size interpolation lives here. Backdrop-filter must not: WKWebView
+   * rebuilds that layer when a blur-owning box finishes a width
+   * transition (one-frame edge retreat / flash). Overlay / phone /
+   * .is-resizing override this shorthand.
+   */
+  transition:
+    width var(--motion-pane) var(--motion-pane-ease),
+    min-width var(--motion-pane) var(--motion-pane-ease),
+    max-width var(--motion-pane) var(--motion-pane-ease),
+    flex-basis var(--motion-pane) var(--motion-pane-ease),
+    border-color var(--motion-pane) ease,
+    opacity 180ms ease,
+    filter 180ms ease;
+  z-index: 1;
+}
+
+/*
+ * Narrow desktop: overlay the rail instead of squeezing chat.
+ * Width stays the open size; motion is transform (compositor), not flex.
+ */
+.sidebar.sidebar--overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  flex-shrink: 0;
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.22);
+  transition:
+    transform var(--motion-pane) var(--motion-pane-ease),
+    box-shadow var(--motion-pane) ease,
+    border-color var(--motion-pane) ease,
+    opacity 180ms ease,
+    filter 180ms ease;
+}
+
+.sidebar.sidebar--overlay.sidebar--hidden,
+.sidebar.sidebar--overlay.sidebar--collapsed {
+  transform: translateX(-105%);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.workbench-pane-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 34;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+
+/* Drag-resize: skip width transition so the rail tracks the pointer */
+.sidebar.is-resizing {
+  transition: none;
+  user-select: none;
+}
+
+/*
+ * Win/Linux WebView: interpolating used width reflows chat every frame.
+ * Snap the flex box; clip opacity still fades. Mac keeps the base
+ * `.sidebar` size tween (WKWebView hard-cut / seam contract).
+ * Overlay / phone keep their transform rule (excluded here).
+ */
+.platform-win .sidebar:not(.is-resizing):not(.sidebar--overlay):not(.sidebar--phone-drawer),
+.platform-linux .sidebar:not(.is-resizing):not(.sidebar--overlay):not(.sidebar--phone-drawer) {
+  transition:
+    border-color var(--motion-pane) ease,
+    opacity 180ms ease,
+    filter 180ms ease;
+}
+
+/* Right-edge drag handle (mirrors .aside-resizer) */
+.sidebar-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  right: 1px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.sidebar-resizer:hover::after,
+.sidebar.is-resizing .sidebar-resizer::after {
+  background: var(--border-focus, #6b8cff);
+}
+
+.sidebar.is-resizing .sidebar-resizer::after {
+  transition: none;
+}
+
+/*
+ * ChatGPT-desktop model (mac in-flow): window already has
+ * NSVisualEffectMaterial::Sidebar. Rails are a translucent tint over that
+ * window glass — no CSS backdrop-filter on a box whose width interpolates
+ * (WKWebView rebuilds that layer and the seam flashes). Overlay / phone
+ * still use CSS blur because they animate transform, not flex width.
+ */
+.platform-mac .sidebar {
+  border-right: none;
+}
+
+.platform-mac .sidebar:not(.sidebar--overlay):not(.sidebar--phone-drawer) {
+  background: var(--bg-sidebar);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--sidebar-edge-shadow);
+}
+
+.platform-mac .sidebar.sidebar--overlay,
+.platform-mac .sidebar.sidebar--phone-drawer {
+  -webkit-backdrop-filter: blur(var(--sidebar-blur)) saturate(var(--sidebar-saturate));
+  backdrop-filter: blur(var(--sidebar-blur)) saturate(var(--sidebar-saturate));
+}
+
+.platform-mac .sidebar.sidebar--overlay {
+  border-right: none;
+}
+
+/* Hairline on solid main — composites against --bg-main, not vibrancy. */
+.platform-mac .main {
+  box-shadow: var(--sidebar-seam);
+}
+
+.workbench:has(> .sidebar.sidebar--hidden) .main,
+.workbench:has(> .sidebar.sidebar--collapsed) .main,
+.workbench:has(> .sidebar.sidebar--overlay) .main,
+.app-shell--phone .main {
+  box-shadow: none;
+}
+
+/*
+ * ── Light theme chrome (reference: ChatGPT settings) ─────────────────────
+ * Sidebar: translucent white glass (more open than solid main).
+ * Main / aside / settings content: pure solid white, slightly elevated.
+ * Edge: soft inward shade on rail right (not a hard double hairline).
+ * Requires setTheme('light') so native vibrancy is light.
+ */
+html.platform-mac[data-theme="light"] .app-shell {
+  /* Fully transparent shell so glass rail samples vibrancy; soft rim only */
+  background: transparent;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+html.platform-mac[data-theme="light"] .workbench {
+  background: transparent;
+}
+
+html.platform-mac[data-theme="light"] .sidebar:not(.sidebar--overlay):not(.sidebar--phone-drawer),
+.platform-mac[data-theme="light"] .sidebar:not(.sidebar--overlay):not(.sidebar--phone-drawer) {
+  background: var(--bg-sidebar);
+  border-right: none;
+  box-shadow: var(--sidebar-edge-shadow);
+}
+
+/* Solid elevated content columns — pure white, sit above glass rail */
+html.platform-mac[data-theme="light"] .main {
+  background: #ffffff;
+  border-left: none;
+  box-shadow: var(--sidebar-seam);
+  z-index: 2;
+}
+
+html.platform-mac[data-theme="light"] .workbench:has(> .sidebar.sidebar--hidden) .main,
+html.platform-mac[data-theme="light"] .workbench:has(> .sidebar.sidebar--collapsed) .main,
+html.platform-mac[data-theme="light"] .workbench:has(> .sidebar.sidebar--overlay) .main,
+html.platform-mac[data-theme="light"] .app-shell--phone .main {
+  box-shadow: none;
+}
+
+html.platform-mac[data-theme="light"] .aside {
+  background: var(--bg-sidebar);
+  border-left: 1px solid rgba(0, 0, 0, 0.05);
+  z-index: 2;
+}
+
+/*
+ * Settings page chrome is always solid (no theme/wallpaper glass).
+ * Forms stay readable over a wallpaper; nav matches the solid sidebar plate.
+ */
+.platform-mac .settings-page {
+  background: var(--bg-main);
+}
+
+.platform-mac .settings-page__nav {
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-right: none;
+  box-shadow: var(--sidebar-edge-shadow);
+  overflow: visible;
+}
+
+.platform-mac .settings-page__content {
+  background: var(--bg-main);
+  z-index: 2;
+  box-shadow: var(--sidebar-seam);
+}
+
+html.platform-mac[data-theme="light"] .settings-page__nav {
+  border-right: none;
+  box-shadow: var(--sidebar-edge-shadow);
+}
+
+html.platform-mac[data-theme="light"] .settings-page,
+html.platform-mac[data-theme="light"] .settings-page__content {
+  background: #ffffff;
+  box-shadow: var(--sidebar-seam);
+}
+
+/* Fully closed left pane (no icon rail) — reopen from main top icons.
+ * Width stays on the inline style. !important:0 here is a hard cut. */
+.sidebar--hidden,
+.sidebar--collapsed {
+  padding: 0 !important;
+  border-right-color: transparent;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sidebar__clip {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  opacity: 1;
+  transition: opacity var(--motion-pane) ease;
+}
+
+.sidebar:not(.sidebar--overlay):not(.sidebar--phone-drawer):not(.is-resizing)
+  .sidebar__clip
+  > * {
+  width: var(--sidebar-rail-min, 268px);
+  min-width: var(--sidebar-rail-min, 268px);
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.sidebar--hidden .sidebar__clip,
+.sidebar--collapsed .sidebar__clip {
+  opacity: 0;
+}
+
+/* Row 1: same height as main__top + rv__head — keep divider Y aligned across panes */
+.sidebar-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--titlebar-height, 40px);
+  min-height: var(--titlebar-height, 40px);
+  max-height: var(--titlebar-height, 40px);
+  padding: 0 10px;
+  /* Traffic lights + fixed pane toggle — search starts just to the right */
+  padding-left: calc(var(--titlebar-safe-left, 96px) + 34px);
+  margin: 0;
+  user-select: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  /* No bottom border: left rail is continuous glass; L/R split lines still share the 40px band */
+}
+
+.platform-win .sidebar-chrome,
+.platform-other .sidebar-chrome,
+.has-custom-chrome .sidebar-chrome {
+  padding-left: 44px;
+}
+
+.sidebar-chrome__drag {
+  flex: 1;
+  height: 100%;
+  min-width: 8px;
+}
+
+.sidebar-chrome__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Legacy brand cluster helper (nav row styles live in sidebar.part4.css). */
+.sidebar-brand-row__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  flex-shrink: 1;
+}
+
+/* Swappable provider brand marks — height-locked for size parity with nav icons.
+ * Wordmarks (DeepSeek / OpenCode) scale by height; icon-only (Volcengine /
+ * Amux) use the same height via ProviderBrandIcon `size`. */
+.sidebar-brand-row__left .sidebar-brand-mark--wordmark,
+.sidebar-brand-row__left .deepseek-full-mark.sidebar-brand-mark,
+.sidebar-brand-row__left .opencode-wordmark.sidebar-brand-mark,
+.nav-new__brand .sidebar-brand-mark--wordmark,
+.nav-new__brand .deepseek-full-mark.sidebar-brand-mark,
+.nav-new__brand .opencode-wordmark.sidebar-brand-mark {
+  display: block;
+  height: 16px;
+  width: auto;
+  max-width: min(120px, 42vw);
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.sidebar-brand-row__left .sidebar-brand-mark--icon {
+  flex-shrink: 0;
+  display: block;
+}
+
+.sidebar-brand-row__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* App update affordance — right of brand logo, accent glyph + corner dot. */
+.sidebar-update-btn {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--accent, #6b9fff);
+  cursor: pointer;
+  overflow: visible;
+}
+
+.sidebar-update-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, #6b9fff) 14%, transparent);
+  color: var(--accent-hover, var(--accent, #6b9fff));
+}
+
+.sidebar-update-btn:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.sidebar-update-btn--busy {
+  opacity: 0.9;
+}
+
+.sidebar-update-btn__dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #6b9fff);
+  box-shadow: 0 0 0 1.5px var(--bg-secondary, var(--bg-primary, #1a1a1a));
+  pointer-events: none;
+}
+
+.sidebar-update-btn__dot--pulse {
+  animation: sidebar-update-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sidebar-update-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-update-btn__dot--pulse {
+    animation: none;
+  }
+}
+
+.chrome-btn {
+  /* relative: rp-chrome__badge is position:absolute; without this it
+     anchors to .main / window and drifts to the top-right corner. */
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Allow badge to peek past the 28×28 hit box */
+  overflow: visible;
+}
+
+.chrome-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

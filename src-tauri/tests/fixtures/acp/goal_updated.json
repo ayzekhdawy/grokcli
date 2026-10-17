@@ -1,0 +1,81 @@
+{
+  "_comment": "CLI 0.2.117+ goal harness session/update samples (sessionUpdate: goal_updated). Host decoder: decode_session_update() → AcpEvent::GoalUpdated → session://goal. Soft-fail: older CLIs never emit these.",
+  "frames": [
+    {
+      "method": "session/update",
+      "params": {
+        "update": {
+          "sessionUpdate": "goal_updated",
+          "goal_id": "goal-fixture-1",
+          "current_subagent_role": "goal planner",
+          "current_deliverable_title": "Outline acceptance criteria",
+          "completed_deliverables": 0,
+          "total_deliverables": 2,
+          "verifying_completion": false,
+          "objective": "Ship goal orchestration UX"
+        }
+      }
+    },
+    {
+      "method": "session/update",
+      "params": {
+        "update": {
+          "sessionUpdate": "goal_updated",
+          "goal_id": "goal-fixture-1",
+          "current_subagent_role": "goal strategist",
+          "current_deliverable_title": "Route classifier path",
+          "completed_deliverables": 0,
+          "total_deliverables": 2,
+          "verifying_completion": false
+        }
+      }
+    },
+    {
+      "method": "session/update",
+      "params": {
+        "update": {
+          "sessionUpdate": "goal_updated",
+          "goal_id": "goal-fixture-1",
+          "current_subagent_role": "worker",
+          "current_deliverable_title": "Implement GOAL-ORCH-UX",
+          "completed_deliverables": 1,
+          "total_deliverables": 2,
+          "verifying_completion": false,
+          "total_worker_rounds": 1
+        }
+      }
+    },
+    {
+      "method": "session/update",
+      "params": {
+        "update": {
+          "sessionUpdate": "goal_updated",
+          "goal_id": "goal-fixture-1",
+          "current_subagent_role": "goal classifier",
+          "current_deliverable_title": "Implement GOAL-ORCH-UX",
+          "completed_deliverables": 1,
+          "total_deliverables": 2,
+          "verifying_completion": true,
+          "classifier_runs_attempted": 1,
+          "classifier_max_runs": 3,
+          "last_classifier_verdict": "not_achieved",
+          "total_verify_rounds": 1
+        }
+      }
+    },
+    {
+      "method": "session/update",
+      "params": {
+        "update": {
+          "sessionUpdate": "goal_updated",
+          "goal_id": "goal-fixture-1",
+          "current_subagent_role": "skeptic",
+          "verifying_completion": true,
+          "last_classifier_verdict": "achieved",
+          "completed_deliverables": 2,
+          "total_deliverables": 2
+        }
+      }
+    }
+  ]
+}

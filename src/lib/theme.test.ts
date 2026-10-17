@@ -1,0 +1,413 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  DEFAULT_RESOLVED_THEME,
+  DEFAULT_THEME_PREFERENCE,
+  getSystemTheme,
+  loadTheme,
+  loadThemePreference,
+  nativeWindowThemeArg,
+  OS_THEME_CHANGED_EVENT,
+  parseOsThemePayload,
+  parseTheme,
+  parseThemePreference,
+  readOsTheme,
+  resolveTheme,
+  runThemeTransition,
+  saveTheme,
+  saveThemePreference,
+  subscribeHostOsTheme,
+  subscribeSystemTheme,
+  switchTheme,
+  WEBKIT_THEME_SNAPSHOT_MAX_ELEMENTS,
+  THEME_STORAGE_KEY,
+  toggleTheme,
+  toggleThemePreference,
+  type ThemeStorage,
+} from "./theme";
+
+function memoryStorage(initial: Record<string, string> = {}): ThemeStorage & {
+  data: Record<string, string>;
+} {
+  const data = { ...initial };
+  return {
+    data,
+    getItem(key) {
+      return key in data ? data[key]! : null;
+    },
+    setItem(key, value) {
+      data[key] = value;
+    },
+  };
+}
+
+describe("theme preference + resolve", () => {
+  it("defaults preference to system", () => {
+    expect(DEFAULT_THEME_PREFERENCE).toBe("system");
+    expect(parseThemePreference(null)).toBe("system");
+    expect(parseThemePreference("nope")).toBe("system");
+    expect(parseThemePreference("system")).toBe("system");
+  });
+
+  it("keeps explicit light/dark preferences", () => {
+    expect(parseThemePreference("light")).toBe("light");
+    expect(parseThemePreference("dark")).toBe("dark");
+  });
+
+  it("resolves system to the given OS theme", () => {
+    expect(resolveTheme("system", "light")).toBe("light");
+    expect(resolveTheme("system", "dark")).toBe("dark");
+    expect(resolveTheme("light", "dark")).toBe("light");
+    expect(resolveTheme("dark", "light")).toBe("dark");
+  });
+
+  it("getSystemTheme reads matchMedia when provided", () => {
+    const darkMq = {
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    } as unknown as MediaQueryList;
+    const lightMq = {
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    } as unknown as MediaQueryList;
+    expect(getSystemTheme(() => darkMq)).toBe("dark");
+    expect(getSystemTheme(() => lightMq)).toBe("light");
+    expect(getSystemTheme(null)).toBe(DEFAULT_RESOLVED_THEME);
+  });
+
+  it("toggles dark ↔ light", () => {
+    expect(toggleTheme("dark")).toBe("light");
+    expect(toggleTheme("light")).toBe("dark");
+  });
+
+  it("quick toggle leaves system and flips resolved", () => {
+    expect(toggleThemePreference("system", "dark")).toBe("light");
+    expect(toggleThemePreference("system", "light")).toBe("dark");
+    expect(toggleThemePreference("dark", "dark")).toBe("light");
+  });
+
+  it("empty storage loads preference system and resolves", () => {
+    const storage = memoryStorage();
+    expect(loadThemePreference(storage)).toBe("system");
+    // Without window matchMedia in node, resolve uses DEFAULT_RESOLVED_THEME
+    expect(loadTheme(storage)).toBe(DEFAULT_RESOLVED_THEME);
+  });
+
+  it("migrates legacy light/dark storage", () => {
+    const storage = memoryStorage({ [THEME_STORAGE_KEY]: "light" });
+    expect(loadThemePreference(storage)).toBe("light");
+    expect(loadTheme(storage)).toBe("light");
+  });
+
+  it("persists system preference", () => {
+    const storage = memoryStorage();
+    saveThemePreference(storage, "system");
+    expect(storage.getItem(THEME_STORAGE_KEY)).toBe("system");
+    expect(loadThemePreference(storage)).toBe("system");
+  });
+
+  it("switchTheme persists explicit light/dark", () => {
+    const storage = memoryStorage();
+    const after = switchTheme("dark", storage);
+    expect(after).toBe("light");
+    expect(storage.data[THEME_STORAGE_KEY]).toBe("light");
+    expect(loadTheme(storage)).toBe("light");
+  });
+
+  it("saveTheme writes the storage key used by the UI", () => {
+    const storage = memoryStorage();
+    saveTheme(storage, "light");
+    expect(storage.getItem(THEME_STORAGE_KEY)).toBe("light");
+  });
+
+  it("subscribeSystemTheme fires on change", () => {
+    const listeners = new Set<() => void>();
+    const mql = {
+      matches: true,
+      addEventListener: (_: string, cb: () => void) => {
+        listeners.add(cb);
+      },
+      removeEventListener: (_: string, cb: () => void) => {
+        listeners.delete(cb);
+      },
+    } as unknown as MediaQueryList;
+    const seen: string[] = [];
+    const unsub = subscribeSystemTheme((t) => seen.push(t), () => mql);
+    // flip
+    (mql as { matches: boolean }).matches = false;
+    for (const cb of listeners) cb();
+    expect(seen).toEqual(["light"]);
+    unsub();
+    expect(listeners.size).toBe(0);
+  });
+
+  it("parseTheme still accepts concrete themes", () => {
+    expect(parseTheme("light")).toBe("light");
+    expect(parseTheme("dark")).toBe("dark");
+  });
+
+  it("resolveTheme(system) uses latest system argument (switch-to-system path)", () => {
+    // After unlock, caller passes freshly read OS theme — must win over stale state.
+    expect(resolveTheme("system", "dark")).toBe("dark");
+    expect(resolveTheme("system", "light")).toBe("light");
+  });
+
+  it("Windows follow-system locks native chrome to the resolved theme", () => {
+    // WebView2 matchMedia does not live-update after boot lock — push concrete.
+    expect(nativeWindowThemeArg("system", false, "light", "win")).toBe("light");
+    expect(nativeWindowThemeArg("system", false, "dark", "win")).toBe("dark");
+    expect(nativeWindowThemeArg("system", false, "dark", "mac")).toBeNull();
+    expect(nativeWindowThemeArg("system", false, "light", "linux")).toBeNull();
+    expect(nativeWindowThemeArg("system", true, "light", "mac")).toBe("light");
+    expect(nativeWindowThemeArg("dark", false, "dark", "win")).toBe("dark");
+    expect(nativeWindowThemeArg("light", false, "light", "mac")).toBe("light");
+  });
+
+  it("parseOsThemePayload accepts command strings and host events", () => {
+    expect(parseOsThemePayload("light")).toBe("light");
+    expect(parseOsThemePayload("dark")).toBe("dark");
+    expect(parseOsThemePayload({ theme: "light" })).toBe("light");
+    expect(parseOsThemePayload({ theme: "nope" })).toBeNull();
+    expect(parseOsThemePayload(null)).toBeNull();
+  });
+
+  it("readOsTheme prefers a host probe over matchMedia", async () => {
+    await expect(readOsTheme(async () => ({ theme: "light" }))).resolves.toBe(
+      "light",
+    );
+    await expect(readOsTheme(async () => "dark")).resolves.toBe("dark");
+  });
+
+  it("runs theme updates directly without View Transition support", () => {
+    const update = vi.fn();
+    const doc = {
+      defaultView: { matchMedia: () => ({ matches: false }) },
+      documentElement: { dataset: {} },
+      visibilityState: "visible",
+    } as unknown as Document;
+
+    runThemeTransition(update, doc);
+
+    expect(update).toHaveBeenCalledOnce();
+  });
+
+  it("skips animation when reduced motion is enabled", () => {
+    const update = vi.fn();
+    const startViewTransition = vi.fn();
+    const doc = {
+      defaultView: { matchMedia: () => ({ matches: true }) },
+      documentElement: { dataset: {} },
+      visibilityState: "visible",
+      startViewTransition,
+    } as unknown as Document;
+
+    runThemeTransition(update, doc);
+
+    expect(update).toHaveBeenCalledOnce();
+    expect(startViewTransition).not.toHaveBeenCalled();
+  });
+
+  it("animates WebKit theme colors without using a glass-breaking snapshot", () => {
+    vi.useFakeTimers();
+    try {
+      let updated = false;
+      const animation = {
+        cancel: vi.fn(),
+        finished: new Promise<void>(() => {}),
+      };
+      const animate = vi.fn(
+        (
+          _keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+          _options?: number | KeyframeAnimationOptions,
+        ) => animation as unknown as Animation,
+      );
+      const update = vi.fn(() => {
+        updated = true;
+      });
+      const startViewTransition = vi.fn((commit: () => void) => {
+        commit();
+        return { finished: Promise.resolve(), skipTransition: vi.fn() };
+      });
+      const doc = {
+        defaultView: {
+          matchMedia: () => ({ matches: false }),
+          navigator: {
+            userAgent:
+              "Mozilla/5.0 AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15",
+          },
+          innerWidth: 1200,
+          innerHeight: 800,
+          getComputedStyle: () => ({
+            color: updated ? "rgb(255, 255, 255)" : "rgb(0, 0, 0)",
+            backgroundColor: updated
+              ? "rgb(20, 20, 20)"
+              : "rgb(255, 255, 255)",
+            borderTopColor: "rgba(0, 0, 0, 0)",
+            borderRightColor: "rgba(0, 0, 0, 0)",
+            borderBottomColor: "rgba(0, 0, 0, 0)",
+            borderLeftColor: "rgba(0, 0, 0, 0)",
+            outlineColor: "rgba(0, 0, 0, 0)",
+            fill: "none",
+            stroke: "none",
+          }),
+        },
+        documentElement: {
+          animate,
+          dataset: {},
+          getBoundingClientRect: () => ({
+            bottom: 800,
+            height: 800,
+            left: 0,
+            right: 1200,
+            top: 0,
+            width: 1200,
+          }),
+          isConnected: true,
+        },
+        querySelectorAll: () => [],
+        visibilityState: "visible",
+        startViewTransition,
+      } as unknown as Document;
+
+      runThemeTransition(update, doc);
+
+      expect(update).toHaveBeenCalledOnce();
+      expect(startViewTransition).not.toHaveBeenCalled();
+      expect(doc.documentElement.dataset.themeTransition).toBe("webkit");
+      expect(animate).toHaveBeenCalledOnce();
+      const keyframes = animate.mock.calls[0]?.[0];
+      expect(keyframes).toEqual([
+        expect.objectContaining({
+          backgroundColor: "rgb(255, 255, 255)",
+          color: "rgb(0, 0, 0)",
+        }),
+        expect.objectContaining({
+          backgroundColor: "rgb(20, 20, 20)",
+          color: "rgb(255, 255, 255)",
+        }),
+      ]);
+      expect(JSON.stringify(keyframes)).not.toMatch(
+        /(?:transform|opacity|backdropFilter)/,
+      );
+
+      vi.runAllTimers();
+      expect(doc.documentElement.dataset.themeTransition).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("skips WebKit theme snapshot when the DOM exceeds the element cap", () => {
+    const animate = vi.fn();
+    const update = vi.fn();
+    const startViewTransition = vi.fn();
+    const getBoundingClientRect = vi.fn(() => ({
+      bottom: 10,
+      height: 10,
+      left: 0,
+      right: 10,
+      top: 0,
+      width: 10,
+    }));
+    const getComputedStyle = vi.fn(() => ({
+      color: "rgb(0, 0, 0)",
+      backgroundColor: "rgb(255, 255, 255)",
+      borderTopColor: "rgba(0, 0, 0, 0)",
+      borderRightColor: "rgba(0, 0, 0, 0)",
+      borderBottomColor: "rgba(0, 0, 0, 0)",
+      borderLeftColor: "rgba(0, 0, 0, 0)",
+      outlineColor: "rgba(0, 0, 0, 0)",
+      fill: "none",
+      stroke: "none",
+    }));
+    const stubEl = {
+      animate,
+      getBoundingClientRect,
+      isConnected: true,
+    };
+    const listed = Array.from(
+      { length: WEBKIT_THEME_SNAPSHOT_MAX_ELEMENTS },
+      () => stubEl,
+    );
+    const doc = {
+      defaultView: {
+        matchMedia: () => ({ matches: false }),
+        navigator: {
+          userAgent:
+            "Mozilla/5.0 AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15",
+        },
+        innerWidth: 1200,
+        innerHeight: 800,
+        getComputedStyle,
+      },
+      documentElement: {
+        animate,
+        dataset: {} as Record<string, string>,
+        getBoundingClientRect,
+        isConnected: true,
+      },
+      querySelectorAll: () => listed,
+      visibilityState: "visible",
+      startViewTransition,
+    } as unknown as Document;
+
+    runThemeTransition(update, doc);
+
+    expect(update).toHaveBeenCalledOnce();
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(animate).not.toHaveBeenCalled();
+    expect(getBoundingClientRect).not.toHaveBeenCalled();
+    expect(getComputedStyle).not.toHaveBeenCalled();
+    expect(doc.documentElement.dataset.themeTransition).toBeUndefined();
+  });
+
+  it("keeps only the latest rapid theme transition update", async () => {
+    const callbacks: Array<() => void> = [];
+    const transitions: Array<{
+      finished: Promise<void>;
+      skipTransition: ReturnType<typeof vi.fn>;
+    }> = [];
+    const doc = {
+      defaultView: { matchMedia: () => ({ matches: false }) },
+      documentElement: { dataset: {} },
+      visibilityState: "visible",
+      startViewTransition: (callback: () => void) => {
+        callbacks.push(callback);
+        const transition = {
+          finished: Promise.resolve(),
+          skipTransition: vi.fn(),
+        };
+        transitions.push(transition);
+        return transition;
+      },
+    } as unknown as Document;
+    const seen: string[] = [];
+
+    runThemeTransition(() => seen.push("light"), doc);
+    runThemeTransition(() => seen.push("dark"), doc);
+    callbacks[1]?.();
+    callbacks[0]?.();
+    await Promise.resolve();
+
+    expect(transitions[0]?.skipTransition).toHaveBeenCalledOnce();
+    expect(seen).toEqual(["dark"]);
+    expect(doc.documentElement.dataset.themeTransition).toBeUndefined();
+  });
+
+  it("subscribeHostOsTheme forwards parsed host payloads", async () => {
+    const listeners = new Map<string, (p: unknown) => void>();
+    const listen = async (event: string, handler: (p: unknown) => void) => {
+      listeners.set(event, handler);
+      return () => {
+        listeners.delete(event);
+      };
+    };
+    const seen: string[] = [];
+    const unsub = await subscribeHostOsTheme((t) => seen.push(t), listen);
+    listeners.get(OS_THEME_CHANGED_EVENT)?.({ theme: "light" });
+    expect(seen).toEqual(["light"]);
+    unsub();
+    expect(listeners.size).toBe(0);
+  });
+});

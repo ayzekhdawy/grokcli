@@ -1,0 +1,14 @@
+# Single-package app workspace (required by pnpm when this file exists).
+packages:
+  - "."
+
+# pnpm 11: explicit allowlist for packages that may run postinstall scripts.
+allowBuilds:
+  "@swc/core": true
+  esbuild: true
+  canvas: true
+
+onlyBuiltDependencies:
+  - esbuild
+  - canvas
+  - "@swc/core"

@@ -1,0 +1,958 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+@media (max-width: 820px) {
+  .app-shell--phone .workbench,
+  .app-shell--mirror.app-shell--phone .workbench {
+    position: relative;
+  }
+
+  /* ── Top bar: 56px, hamburger | centred title | account ──────────────── */
+  .app-shell--phone .main__top,
+  .app-shell--phone .main__top--phone {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    padding-left: max(4px, env(safe-area-inset-left, 0px));
+    padding-right: max(4px, env(safe-area-inset-right, 0px));
+    gap: 4px;
+  }
+
+  /* Flatten so hamburger + title become grid items next to the account column */
+  .app-shell--phone .main__top--phone .main__title-row {
+    display: contents;
+  }
+
+  .app-shell--phone .main__title {
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    min-width: 0;
+    grid-column: 2;
+  }
+
+  .app-shell--phone .main__title-menu {
+    display: none;
+  }
+
+  .app-shell--phone .main__top-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0;
+    grid-column: 3;
+  }
+
+  .app-shell--phone .main__phone-menu,
+  .app-shell--phone .main__phone-account {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 12px;
+  }
+
+  .app-shell--phone .main__phone-menu {
+    grid-column: 1;
+  }
+
+  /* ── Session drawer: overlay, ~85% width, does not push chat ─────────── */
+  .app-shell--phone .sidebar,
+  .app-shell--phone .sidebar.sidebar--phone-drawer {
+    position: fixed;
+    z-index: 60;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(85vw, 320px);
+    max-width: 320px;
+    min-width: 0 !important;
+    transform: translateX(0);
+    transition:
+      transform var(--motion-pane) var(--motion-pane-ease),
+      box-shadow var(--motion-pane) ease;
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    opacity: 1;
+    overflow: hidden;
+    pointer-events: auto;
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  /* Phone drawer is fixed-width overlay — no desktop edge resize */
+  .app-shell--phone .sidebar-resizer {
+    display: none;
+  }
+
+  /* Drawer has no traffic lights / fixed pane toggle — keep a normal inset */
+  .app-shell--phone .sidebar-chrome {
+    padding-left: 10px;
+  }
+
+  .app-shell--phone .sidebar.sidebar--hidden,
+  .app-shell--phone .sidebar.sidebar--collapsed {
+    width: min(85vw, 320px) !important;
+    max-width: 320px !important;
+    min-width: 0 !important;
+    transform: translateX(-105%);
+    box-shadow: none;
+    pointer-events: none;
+    opacity: 1;
+    overflow: hidden;
+    border: none !important;
+    /* keep padding for off-screen layout; still not interactive */
+  }
+
+  .app-shell--phone .phone-drawer-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    border: none;
+    margin: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-shell--phone .main {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* ── Composer: bottom pin + keyboard inset ───────────────────────────── */
+  .app-shell--phone .composer-wrap,
+  .app-shell--phone .composer-wrap--float {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: var(--phone-keyboard-inset, 0px);
+    z-index: 20;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+  }
+
+  /*
+   * Empty state: SuperGrok centred in free space above the pinned composer.
+   * Do NOT position the mark with top/bottom + --composer-float-pad: on welcome
+   * the wrap fills the stage so ResizeObserver sets that var to ~full height,
+   * which collapses an absolute mark box to height 0 at top:0 and the SVG
+   * overflows half above the stage (under the 56px top bar). Flex-grow the
+   * mark instead so centering never depends on the pad measurement.
+   */
+  .app-shell--phone .composer-wrap--welcome {
+    top: 0;
+    bottom: var(--phone-keyboard-inset, 0px);
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    background: transparent;
+    gap: 0;
+    padding-top: 24px;
+  }
+
+  .app-shell--phone .composer-wrap--welcome .composer-welcome-mark {
+    position: relative;
+    flex: 1 1 auto;
+    align-self: stretch;
+    width: auto;
+    max-width: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: 0;
+    pointer-events: none;
+  }
+
+  .app-shell--phone .composer {
+    max-width: 100%;
+    border-radius: 20px;
+    padding: 12px 12px 10px;
+  }
+
+  .app-shell--phone .composer__input,
+  .app-shell--phone .composer__input [contenteditable],
+  .app-shell--phone .composer-editor {
+    font-size: 16px; /* avoid iOS focus zoom */
+    line-height: 1.45;
+  }
+
+  .app-shell--phone .composer__row--phone {
+    min-height: 44px;
+    gap: 8px;
+  }
+
+  .app-shell--phone .composer__row--phone .icon-btn,
+  .app-shell--phone .composer__row--phone .icon-btn--plus,
+  .app-shell--phone .composer__row--phone .icon-btn--primary,
+  .app-shell--phone .composer__row--phone .icon-btn--danger {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  /* ── Right resource pane: full-screen overlay (never side-by-side) ───── */
+  .app-shell--phone .aside,
+  .app-shell--phone .aside.aside--phone-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-shadow: none;
+    transform: translateX(0);
+    transition: transform var(--motion-pane) var(--motion-pane-ease);
+  }
+
+  .app-shell--phone .aside.aside--hidden,
+  .app-shell--phone .aside.aside--phone-overlay.aside--hidden {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    transform: translateX(105%);
+    opacity: 1;
+    pointer-events: none;
+    overflow: hidden;
+    border-left-color: transparent;
+  }
+
+  .app-shell--phone .aside-resizer {
+    display: none !important;
+  }
+
+  /* ── Touch targets ≥ 44px ────────────────────────────────────────────── */
+  .app-shell--phone .perm-bar__btn,
+  .app-shell--phone .ask-user__opt,
+  .app-shell--phone .ask-user-bar__actions .btn,
+  .app-shell--phone .nav-new,
+  .app-shell--phone .nav-item,
+  .app-shell--phone .chrome-btn,
+  .app-shell--phone .composer__send,
+  .app-shell--phone .composer__stop,
+  .app-shell--phone .composer__plus,
+  .app-shell--phone .icon-btn,
+  .app-shell--phone button.btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Drawer section headers (專案 / 其他對話) — desktop is 28px */
+  .app-shell--phone .tree-l1__head {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .app-shell--phone .tree-l1 {
+    --tree-l1-gutter: var(--tree-l1-gutter-touch);
+  }
+
+  .app-shell--phone .tree-l1__head--toggle,
+  .app-shell--phone .tree-l1__chevron {
+    width: var(--tree-l1-gutter);
+    min-width: var(--tree-l1-gutter);
+  }
+
+  .app-shell--phone .space-switcher__btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .app-shell--phone .tree-l1__action {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Scroll-to-latest (lobe BackBottom) — desktop is 36px */
+  .app-shell--phone .lobe-chat-back-bottom {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .app-shell--phone .ask-user-bar__main {
+    flex-direction: column;
+  }
+
+  .app-shell--phone .ask-user-bar__actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    width: 100%;
+    position: static;
+  }
+
+  .app-shell--phone .perm-bar__btn,
+  .app-shell--phone .ask-user__opt {
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+
+  .app-shell--phone .session-row,
+  .app-shell--phone .tree-l2__row,
+  .app-shell--phone .tree-l3,
+  .app-shell--phone .tree-l2 {
+    min-height: 44px;
+  }
+
+  .app-shell--phone .nav-new,
+  .app-shell--phone .nav-item {
+    font-size: 15px;
+  }
+
+  .app-shell--phone .sidebar__footer {
+    min-height: 52px;
+  }
+
+  .app-shell--phone .sidebar__footer-settings {
+    width: 36px;
+    height: 36px;
+  }
+
+  .app-shell--phone .tree-l3__name,
+  .app-shell--phone .tree-l2__name {
+    font-size: 15px;
+  }
+
+  /* Type scale bump for phone readability */
+  .app-shell--phone .lobe-chat,
+  .app-shell--phone .chat-surface {
+    font-size: 15px;
+  }
+
+  .app-shell--phone .status-pill {
+    font-size: 13px;
+    padding: 0 10px;
+  }
+
+  /*
+   * Settings phone drill-down (≤820 + phoneLayout only).
+   * Index = full-width section list; detail = full-width section content.
+   * Never show nav + content side-by-side. Desktop ≥821 is unaffected.
+   */
+  .app-shell--phone .settings-page {
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .app-shell--phone .settings-page__chrome {
+    display: none;
+  }
+
+  .app-shell--phone .settings-page__nav {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 auto;
+    border-right: none;
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg-main);
+  }
+
+  .app-shell--phone .settings-page__nav-inner {
+    padding: 8px 12px 24px;
+    gap: 4px;
+    max-width: 100%;
+  }
+
+  .app-shell--phone .settings-page__back {
+    height: auto;
+    min-height: 44px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+
+  .app-shell--phone .settings-page__search {
+    height: auto;
+    min-height: 44px;
+    padding: 0 12px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+
+  .app-shell--phone .settings-page__search input {
+    font-size: 16px; /* avoid iOS focus zoom */
+    min-height: 44px;
+  }
+
+  .app-shell--phone .settings-page__group-label {
+    margin: 14px 10px 6px;
+    font-size: 12px;
+  }
+
+  .app-shell--phone .settings-page__nav-empty {
+    padding: 48px 16px;
+    gap: 8px;
+  }
+
+  .app-shell--phone .settings-page__nav-empty-title {
+    font-size: 16px;
+  }
+
+  .app-shell--phone .settings-page__nav-empty-hint {
+    font-size: 14px;
+  }
+
+  .app-shell--phone .settings-page__nav-item {
+    height: auto;
+    min-height: 44px;
+    padding: 12px 12px;
+    gap: 12px;
+    font-size: 16px;
+    border-radius: 12px;
+  }
+
+  .app-shell--phone .settings-page__nav-label {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .app-shell--phone .settings-page__nav-chevron {
+    margin-left: auto;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+  }
+
+  /* Index: hide content column entirely */
+  .app-shell--phone .settings-page--phone-index .settings-page__content,
+  .app-shell--phone .settings-page__content[hidden] {
+    display: none !important;
+  }
+
+  /* Detail: hide nav list entirely */
+  .app-shell--phone .settings-page--phone-detail .settings-page__nav,
+  .app-shell--phone .settings-page__nav[hidden] {
+    display: none !important;
+  }
+
+  .app-shell--phone .settings-page__content {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-top: 0;
+    overflow-x: hidden;
+  }
+
+  .app-shell--phone .settings-page__phone-bar {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    height: 56px;
+    min-height: 56px;
+    padding-left: max(4px, env(safe-area-inset-left, 0px));
+    padding-right: max(4px, env(safe-area-inset-right, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-main);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    box-sizing: border-box;
+  }
+
+  .app-shell--phone .settings-page__phone-back {
+    grid-column: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-shell--phone .settings-page__phone-back:hover {
+    background: var(--bg-hover);
+  }
+
+  .app-shell--phone .settings-page__phone-title {
+    grid-column: 2;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .app-shell--phone .settings-page__main {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 16px 16px 96px;
+    box-sizing: border-box;
+  }
+
+  .app-shell--phone .settings-page__title {
+    font-size: 22px;
+    margin-bottom: 14px;
+  }
+
+  .app-shell--phone .settings-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .app-shell--phone .settings-row {
+    min-height: 44px;
+    padding: 14px 14px;
+    gap: 12px;
+  }
+
+  /* Interactive controls inside settings detail ≥ 44×44 */
+  .app-shell--phone .settings-page__main button,
+  .app-shell--phone .settings-page__main .btn,
+  .app-shell--phone .settings-page__main .c-select__trigger,
+  .app-shell--phone .settings-page__main .c-select button,
+  .app-shell--phone .settings-page__main select,
+  .app-shell--phone .settings-page__phone-back {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .app-shell--phone .settings-page__main input.settings-input,
+  .app-shell--phone .settings-page__main input[type="text"],
+  .app-shell--phone .settings-page__main input[type="number"],
+  .app-shell--phone .settings-page__main textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .app-shell--phone .settings-page__nav-inner button,
+  .app-shell--phone .settings-page__nav-inner .settings-page__search {
+    min-height: 44px;
+  }
+}
+
+/* ── Phone bottom sheets (portaled; only mounted when phoneLayout) ─────── */
+.phone-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.phone-sheet__scrim {
+  position: absolute;
+  inset: 0;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.48);
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.phone-sheet__panel {
+  position: relative;
+  pointer-events: auto;
+  width: 100%;
+  max-height: min(78vh, 640px);
+  overflow: auto;
+  background: var(--bg-elevated, var(--bg-main));
+  border-radius: 16px 16px 0 0;
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.28);
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  animation: phone-sheet-up 180ms ease-out;
+}
+
+.phone-sheet__panel--account {
+  max-height: min(60vh, 480px);
+}
+
+@keyframes phone-sheet-up {
+  from {
+    transform: translateY(12%);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone-sheet__panel {
+    animation: none;
+  }
+}
+
+.phone-sheet__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-strong, var(--border-subtle));
+  margin: 10px auto 4px;
+  opacity: 0.7;
+}
+
+.phone-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 8px;
+  min-height: 48px;
+}
+
+.phone-sheet__title {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-sheet__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.phone-sheet__icon-btn:hover,
+.phone-sheet__icon-btn:active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.phone-sheet__icon-btn--spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.phone-sheet__body {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 8px;
+  gap: 2px;
+}
+
+.phone-sheet__section {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 12px 12px 6px;
+}
+
+.phone-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.phone-sheet__row:hover,
+.phone-sheet__row:active,
+.phone-sheet__row.is-active {
+  background: var(--bg-hover);
+}
+
+.phone-sheet__row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.phone-sheet__row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stacked rows (e.g. current model via custom provider): title + sub caption. */
+.phone-sheet__row--stacked .phone-sheet__row-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: normal;
+}
+
+.phone-sheet__row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.phone-sheet__row-sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.phone-sheet__row-value {
+  flex-shrink: 1;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+.phone-sheet__row-chevron {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  display: inline-flex;
+}
+
+.phone-sheet__info {
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phone-sheet__info-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.phone-sheet__info-row strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-account__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin: 4px 4px 8px;
+  border-radius: 14px;
+  background: var(--bg-hover);
+}
+
+.phone-account__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated, var(--bg-main));
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.phone-account__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.phone-account__label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.phone-account__name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-account__status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 12px 12px;
+}
+
+.phone-account__status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.phone-account__status-label {
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.pi-loading {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.pi-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.pi-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px 12px;
+}
+
+.pi-fact {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+
+.pi-fact__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin-bottom: 3px;
+}
+
+.pi-fact__value {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.pi-section {
+  min-width: 0;
+}
+
+.pi-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  margin: 0 0 6px;
+}
+
+.pi-section__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+  min-width: 0;
+}
+
+.pi-section__actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pi-section-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+
+.pi-section-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.pi-section-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

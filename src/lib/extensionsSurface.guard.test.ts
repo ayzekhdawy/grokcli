@@ -1,0 +1,47 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const read = (path: string) => readFileSync(resolve(__dirname, path), "utf8").replace(/\r\n/g, "\n");
+
+describe("extensions settings surface guard", () => {
+  it("wraps every extension tab in the shared opaque settings card", () => {
+    const component = read("../components/ExtensionsPanel.tsx");
+    const surface = component.match(
+      /<div className="settings-card ext-panel__surface">([\s\S]*?)\n\s*<\/div>\n\n\s*<ExtensionsPanelPluginsModals/,
+    )?.[1];
+
+    expect(surface).toBeDefined();
+    for (const tab of ["plugins", "skills", "mcp", "hooks", "agents"]) {
+      expect(surface).toContain(`tab === "${tab}"`);
+    }
+  });
+
+  it("keeps local-path plugin install on the plugins Discover + control", () => {
+    const component = read("../components/ExtensionsPanel.tsx");
+    const modals = read("../components/ExtensionsPanelPluginsModals.tsx");
+    // Anchor stays on the panel's Discover surface; the card + wiring moved
+    // with the plugins modal farm (WP: giant-component decomposition).
+    expect(component).toContain("settings-anchor-ext-plugins-install");
+    expect(component).toContain("openPathInstall");
+    expect(component).toContain("pathInstallOpen");
+    expect(component).toContain("pickDirectory");
+    expect(modals).toContain("PluginPathInstallCard");
+    expect(modals).toContain("openPathInstall");
+  });
+
+  it("reuses the shared card material and keeps its modifier layout-only", () => {
+    const extensionCss = read("../styles/extensions-ref.part1.css");
+    const settingsCss = read("../styles/settings.part1.css");
+
+    expect(settingsCss).toMatch(
+      /\.settings-card\s*\{[^}]*background:\s*var\(--bg-card\);/s,
+    );
+    expect(extensionCss).toMatch(
+      /\.ext-panel__surface\s*\{[^}]*padding:\s*16px;[^}]*min-width:\s*0;/s,
+    );
+    expect(extensionCss).not.toMatch(
+      /\.ext-panel__surface\s*\{[^}]*background:/s,
+    );
+  });
+});

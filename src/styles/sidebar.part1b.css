@@ -1,0 +1,560 @@
+.sidebar__scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* overlay-scroll defaults to overflow:hidden; that + the rail's
+   * color-mix wallpaper fill composites a rectangular inner edge. */
+  overflow: visible;
+}
+
+.sidebar__scroll-inner,
+.sidebar__scroll .overlay-scroll__viewport {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px var(--tree-rail-pad) 10px;
+}
+
+/*
+ * Only session rows use content-visibility. Project headers (tree-l2) must
+ * always paint — culling them caused intermittent blank rows on drag start.
+ */
+.sidebar__scroll .tree-l3 {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
+  contain: layout style;
+  border-radius: 8px;
+}
+
+.sidebar__scroll .tree-l2 {
+  border-radius: 8px;
+}
+
+/* Sidebar items: no focus ring (quiet list chrome) */
+.sidebar .tree-l1__head:focus,
+.sidebar .tree-l1__head:focus-visible,
+.sidebar .tree-l1__action:focus,
+.sidebar .tree-l1__action:focus-visible,
+.sidebar .tree-l2:focus,
+.sidebar .tree-l2:focus-visible,
+.sidebar .tree-l3:focus,
+.sidebar .tree-l3:focus-visible,
+.sidebar .tree-icon-btn:focus,
+.sidebar .tree-icon-btn:focus-visible,
+.sidebar .chrome-btn:focus,
+.sidebar .chrome-btn:focus-visible,
+.sidebar .nav-item:focus,
+.sidebar .nav-item:focus-visible,
+.sidebar .nav-new:focus,
+.sidebar .nav-new:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 3-level project tree — fixed row heights, no hover layout shift */
+.tree-l1 {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  min-height: 28px;
+  padding-right: 2px;
+}
+
+.tree-l1__head {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px 0 0;
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+.tree-l1__head:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.tree-pinned .tree-l1__head,
+.tree-pinned .tree-l1__head:hover {
+  cursor: default;
+  background: transparent;
+}
+
+.tree-l1__head--toggle,
+.tree-l1__chevron {
+  flex: 0 0 auto;
+  width: var(--tree-l1-gutter);
+  min-width: var(--tree-l1-gutter);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tree-l1__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  margin-right: 4px;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.tree-l1__label {
+  flex: 1;
+}
+
+.space-switcher {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.space-switcher__btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.space-switcher__btn:hover,
+.space-switcher.is-open .space-switcher__btn {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.space-switcher__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-switcher__menu {
+  min-width: 200px;
+  max-width: 280px;
+  z-index: 14000;
+}
+
+.space-switcher__opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.space-switcher__opt:hover {
+  background: var(--bg-hover);
+}
+
+.space-switcher__opt.is-active {
+  background: var(--bg-active);
+}
+
+.space-switcher__opt.is-danger {
+  color: var(--danger, #e5484d);
+}
+
+.space-switcher__opt-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-switcher__opt-count {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.space-switcher__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-subtle, var(--glass-border));
+}
+
+.sidebar-empty--space {
+  padding-top: 10px;
+}
+
+.sidebar-empty--space .sidebar-empty__hint {
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tree-l1__actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  /* Collapse + add: only when hovering the Projects row (or keyboard focus). */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.tree-l1:hover .tree-l1__actions,
+.tree-l1:focus-within .tree-l1__actions,
+.tree-l1:has(.tree-l1-more.is-open) .tree-l1__actions,
+.tree-l1:has(.space-switcher.is-open) .tree-l1__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Multi-select: keep group “Select all” visible (not hover-only). */
+.tree-l1__actions--select-mode {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tree-l1__action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.tree-l1__action:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.tree-l1__select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  max-width: 7.5rem;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tree-l1__select-all:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.tree-l1__select-all--on {
+  color: var(--text-secondary);
+}
+
+.tree-l1__select-all-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-project {
+  position: relative;
+  margin-bottom: 2px;
+  /* overflow:hidden on .tree-reveal would otherwise let this flex item shrink
+     below its session list — moving a chat in then clips the extra rows. */
+  flex-shrink: 0;
+}
+
+.tree-l2 {
+  display: flex;
+  align-items: center;
+  gap: var(--tree-l2-gap);
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  box-sizing: border-box;
+  padding: 0 6px 0 var(--tree-l2-pad);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  position: relative;
+}
+
+/* SSH host → remote cwd → sessions */
+.tree-l2--nested {
+  padding-left: calc(var(--tree-l2-pad) + 14px);
+}
+
+.tree-l2:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Project reorder — whole-row drag + floating ghost (pin-group only). */
+.tree-l2--reorderable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.tree-l2--reorderable.tree-l2--dragging,
+.tree-project--dragging .tree-l2 {
+  cursor: grabbing;
+}
+
+/*
+ * While reordering: force paint of session rows too (VirtualList windows
+ * can otherwise briefly reserve empty intrinsic boxes).
+ */
+.sidebar--project-reordering .tree-l3,
+.sidebar--session-moving .tree-l3 {
+  content-visibility: visible !important;
+  contain: none !important;
+}
+
+.sidebar--session-moving {
+  user-select: none;
+  cursor: grabbing;
+}
+
+.tree-l3--dragging {
+  opacity: 0.4;
+}
+
+.tree-l3--drag-ghost {
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--accent, #3b82f6);
+  background: var(--bg-elevated, var(--bg-sidebar-solid, var(--bg-app))) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  content-visibility: visible !important;
+  contain: none !important;
+}
+
+.tree-l2.is-session-drop,
+.tree-l1__head.is-session-drop {
+  outline: 1.5px dashed var(--accent, #3b82f6);
+  outline-offset: -2px;
+  background: var(--bg-hover);
+}
+
+/* Source header is a faint placeholder; children (sessions) stay laid out. */
+.tree-project--dragging > .tree-l2 {
+  opacity: 0.35;
+  background: var(--bg-hover);
+  /* Keep fixed row box so the list does not jump. */
+  min-height: 32px;
+  max-height: 32px;
+}
+
+.tree-project--drop-before::before,
+.tree-project--drop-after::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent, #3b82f6);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Pin the insert line to the header row, not mid expanded session list. */
+.tree-project--drop-before::before {
+  top: 0;
+}
+
+.tree-project--drop-after::after {
+  /* After header (32px), not after the whole expanded block */
+  top: 31px;
+  bottom: auto;
+}
+
+/* Floating drag ghost (cloned header, appended to body). */
+.tree-l2--drag-ghost {
+  opacity: 0.92;
+  cursor: grabbing !important;
+  border-radius: 8px;
+  border: 1.5px dashed var(--accent, #3b82f6);
+  background: var(--bg-elevated, var(--bg-sidebar-solid, var(--bg-app))) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  /* Never participate in content-visibility culling */
+  content-visibility: visible !important;
+  contain: none !important;
+}
+
+.tree-l2--drag-ghost .tree-l2__actions {
+  display: none !important;
+}
+
+/* Folder gone / not a directory (D05) — keep row usable for relocate/remove. */
+.tree-l2--path-missing {
+  color: var(--warning);
+}
+.tree-l2--path-missing:hover {
+  color: var(--warning);
+}
+.tree-l2--path-missing .tree-l2__icon {
+  color: var(--warning);
+  opacity: 1;
+}
+.project-row__badge--path-missing {
+  color: var(--warning);
+  background: var(--warning-muted);
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
+/* Project rows are expand/collapse only — never selected. Selection is tree-l3 sessions. */
+
+.tree-l2__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tree-l2-icon);
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+/* Optional project accent (token or #hex) — sits between folder icon and name. */
+.tree-l2__color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--project-color, var(--accent));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.project-color-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.tree-l2__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  line-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tree-l2__pin,
+.tree-l3__pin {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* Project rows: reserve action slot width — opacity only on hover (no layout jump) */
+.tree-l2__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  width: 48px;
+  min-width: 48px;
+  height: 24px;
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+
+/* Multi-select: always show group select-all; width follows label. */
+.tree-l2__actions--select-mode {
+  width: auto;
+  min-width: 0;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tree-l2__select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  max-width: 7.5rem;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tree-l2__select-all:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.tree-l2__select-all--on {
+  color: var(--text-secondary);
+}
+
+.tree-l2__select-all-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Session actions overlay the row; the title yields only while they are visible. */

@@ -1,0 +1,12 @@
+/* app.css — shell; domain rules in imported files */
+@import "./sidebar.css";
+@import "./settings.css";
+@import "./extensions-ref.css";
+@import "./chat.css";
+@import "./composer.css";
+@import "./modals.css";
+@import "./phone.css";
+@import "./workbench.css";
+@import "./side-workbench.css";
+@import "./sw-env-dock.css";
+@import "./bottom-terminal.css";

@@ -1,0 +1,564 @@
+/**
+ * Codex-style right Side Workbench shell.
+ * Visual shell reuses ResourceViewer `.rp` / `.rp-chrome` styles — function
+ * layer only; does not invent a second design system.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createT, type Locale, type MessageKey } from "@/i18n";
+import { GlassModal } from "@/components/GlassModal";
+import type { PlanReviewState } from "@/lib/planBody";
+import { shouldOpenPlanSideTab } from "@/lib/planModePro";
+import type { SessionFileChange } from "@/lib/sessionChanges";
+import {
+  activeSideTab,
+  applySideStripClose,
+  closeSideTab,
+  emptySideWorkbenchState,
+  isCloseSideTabChord,
+  openSideTab,
+  openSideTabFromPicker,
+  planBulkClose,
+  type BulkCloseAction,
+  setActiveSideTab,
+  setTreeVisible,
+  toggleSideExpanded,
+  type SidePickerKind,
+  type SideWorkbenchState,
+} from "@/lib/sideWorkbench";
+import { isShortcutRecordingActive } from "@/lib/shortcutRemap";
+import * as api from "@/lib/api";
+import type { ResourceOpenTarget } from "@/components/resource-viewer/types";
+import type { SkillInfo } from "@/lib/slashCatalog";
+import type { SkillsPickerSkill } from "@/lib/skillsTaskPicker";
+import { FilesWorkspace } from "./FilesWorkspace";
+import { PlanTab, type PlanTabChrome } from "./PlanTab";
+import { ReviewTab } from "./ReviewTab";
+import { SkillsTab } from "./SkillsTab";
+import { SidePicker } from "./SidePicker";
+import { SideTabBar } from "./SideTabBar";
+import { SideTabBody } from "./SideTabBody";
+
+export type SideWorkbenchProps = {
+  locale: Locale | string;
+  projectPath?: string | null;
+  sshAlias?: string | null;
+  projectName?: string | null;
+  isGitProject?: boolean;
+  state?: SideWorkbenchState;
+  onStateChange?: (next: SideWorkbenchState) => void;
+  onCloseSide: () => void;
+  closeToggleInBar?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
+  /** Bottom-docked compressed composer over expanded side content. */
+  dockComposer?: boolean;
+  onToggleDockComposer?: () => void;
+  paneActive?: boolean;
+  sessionChanges?: SessionFileChange[];
+  /** Host-lifted focus from turn changed-files chips (#998). */
+  reviewFocusPath?: string | null;
+  reviewFocusToken?: number;
+  reviewPinnedPaths?: readonly string[];
+  plan?: PlanReviewState | null;
+  planFocusKey?: number | null;
+  /** PLAN-MODE-PRO empty-state context for Plan tab. */
+  planChrome?: PlanTabChrome | null;
+  onApprovePlan?: () => void;
+  onRequestPlanChanges?: (note?: string) => void;
+  onDismissPlan?: () => void;
+  onOpenPlanHistory?: () => void;
+  openRequest?: ResourceOpenTarget | null;
+  onOpenRequestConsumed?: () => void;
+  /** Host ⌘W: close the active tab via the same dirty-confirm path as ×. */
+  closeActiveRequest?: { token: number } | null;
+  onCloseActiveRequestConsumed?: () => void;
+  autoOpenPlanTab?: boolean;
+  /** Host skills catalog for Find skills side tab. */
+  skillInfos?: readonly SkillInfo[];
+  skillsLoading?: boolean;
+  skillsLoadError?: string | null;
+  onSelectSkill?: (skill: SkillsPickerSkill) => void;
+};
+
+export function SideWorkbench({
+  locale,
+  projectPath = null,
+  sshAlias = null,
+  projectName = null,
+  isGitProject = false,
+  state: controlled,
+  onStateChange,
+  onCloseSide,
+  closeToggleInBar = false,
+  onExpandedChange,
+  dockComposer = false,
+  onToggleDockComposer,
+  paneActive = true,
+  sessionChanges = [],
+  reviewFocusPath: reviewFocusPathProp = null,
+  reviewFocusToken: reviewFocusTokenProp = 0,
+  reviewPinnedPaths = [],
+  plan = null,
+  planFocusKey = null,
+  planChrome = null,
+  onApprovePlan,
+  onRequestPlanChanges,
+  onDismissPlan,
+  onOpenPlanHistory,
+  openRequest = null,
+  onOpenRequestConsumed,
+  closeActiveRequest = null,
+  onCloseActiveRequestConsumed,
+  autoOpenPlanTab = true,
+  skillInfos = [],
+  skillsLoading = false,
+  skillsLoadError = null,
+  onSelectSkill,
+}: SideWorkbenchProps) {
+  const [internal, setInternal] = useState(emptySideWorkbenchState);
+  const state = controlled ?? internal;
+  const lastPlanFocusKey = useRef<number | null>(null);
+  const [dirtyPaths, setDirtyPaths] = useState<string[]>([]);
+  const [closePathRequest, setClosePathRequest] = useState<{
+    path: string;
+    token: number;
+    sideTabId: string;
+  } | null>(null);
+  const closeTokenRef = useRef(0);
+  /** Turn changed-files chip → Review scroll target (#998). */
+  const [reviewFocusPath, setReviewFocusPath] = useState<string | null>(null);
+  const [reviewFocusToken, setReviewFocusToken] = useState(0);
+  const [bulkCloseConfirm, setBulkCloseConfirm] = useState<{
+    next: SideWorkbenchState;
+    dirtyCount: number;
+    totalCount: number;
+  } | null>(null);
+  const tr = useMemo(
+    () => createT((locale as Locale) || "en"),
+    [locale],
+  );
+
+  const setState = useCallback(
+    (next: SideWorkbenchState) => {
+      if (onStateChange) onStateChange(next);
+      else setInternal(next);
+    },
+    [onStateChange],
+  );
+
+  /**
+   * After close mutations: if the strip is empty, collapse the right aside
+   * (same as the chrome “hide side” control) so users are not left on the
+   * empty picker full-height panel.
+   */
+  const applyCloseState = useCallback(
+    (next: SideWorkbenchState) => {
+      setState(next);
+      if (next.tabs.length === 0) {
+        onCloseSide();
+      }
+    },
+    [setState, onCloseSide],
+  );
+
+  const isFilePathDirty = useCallback(
+    (path: string | undefined) => {
+      const p = (path || "").trim();
+      if (!p) return false;
+      const norm = p.replace(/\\/g, "/");
+      return dirtyPaths.some((d) => {
+        const dn = d.replace(/\\/g, "/");
+        return dn === norm || dn.endsWith("/" + norm) || norm.endsWith("/" + dn);
+      });
+    },
+    [dirtyPaths],
+  );
+
+  /** Close a side tab; file tabs with dirty buffers go through FilesWorkspace. */
+  const requestCloseSideTab = useCallback(
+    (id: string) => {
+      const tab = state.tabs.find((t) => t.id === id);
+      if (tab?.kind === "file" && tab.path && isFilePathDirty(tab.path)) {
+        closeTokenRef.current += 1;
+        setClosePathRequest({
+          path: tab.path,
+          token: closeTokenRef.current,
+          sideTabId: id,
+        });
+        return;
+      }
+      applyCloseState(closeSideTab(state, id));
+    },
+    [applyCloseState, isFilePathDirty, state],
+  );
+
+  const dirtyTabIds = useMemo(
+    () =>
+      state.tabs
+        .filter((t) => t.kind === "file" && isFilePathDirty(t.path))
+        .map((t) => t.id),
+    [state.tabs, isFilePathDirty],
+  );
+
+  const requestBulkClose = useCallback(
+    (action: BulkCloseAction, targetId: string) => {
+      const planned = planBulkClose(state, action, targetId, dirtyTabIds);
+      if (planned.dirtyClosing.length === 0) {
+        applyCloseState(planned.next);
+        return;
+      }
+      const totalCount = state.tabs.length - planned.next.tabs.length;
+      setBulkCloseConfirm({
+        next: planned.next,
+        dirtyCount: planned.dirtyClosing.length,
+        totalCount,
+      });
+    },
+    [applyCloseState, dirtyTabIds, state],
+  );
+
+  useEffect(() => {
+    if (!closeActiveRequest) return;
+    const id = state.activeId ?? state.tabs[0]?.id;
+    if (id) requestCloseSideTab(id);
+    onCloseActiveRequestConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeActiveRequest]);
+
+  const onClosePathResult = useCallback(
+    (path: string, closed: boolean) => {
+      const req = closePathRequest;
+      if (!req || req.path !== path) {
+        setClosePathRequest(null);
+        return;
+      }
+      setClosePathRequest(null);
+      if (closed) {
+        applyCloseState(closeSideTab(state, req.sideTabId));
+      }
+    },
+    [applyCloseState, closePathRequest, state],
+  );
+
+  /**
+   * Browser / non-Tauri preview: ⌘W closes the active side tab first
+   * (same pure target as the desktop menu path). Empty strip is a no-op
+   * here — there is no host window close in web preview.
+   * Desktop: File → Close (⌘W) is owned by the native app menu and routed
+   * via `app://close-tab-or-window` (see AppWorkbench).
+   */
+  useEffect(() => {
+    if (!paneActive || api.isTauri()) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+      if (isShortcutRecordingActive()) return;
+      if (!isCloseSideTabChord(e)) return;
+      const result = applySideStripClose(state);
+      if (result.closeWindow || result.needsConfirm) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const id = state.activeId ?? state.tabs[0]?.id;
+      if (id) requestCloseSideTab(id);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [paneActive, state, requestCloseSideTab]);
+
+  const active = useMemo(() => activeSideTab(state), [state]);
+  const hasFileTabs = state.tabs.some((t) => t.kind === "file");
+  const activeFilePath =
+    active?.kind === "file" ? (active.path ?? null) : null;
+  const activeFileLine =
+    active?.kind === "file" ? (active.line ?? null) : null;
+  const activeFileColumn =
+    active?.kind === "file" ? (active.column ?? null) : null;
+
+  const pick = useCallback(
+    (kind: SidePickerKind) => {
+      const next = openSideTabFromPicker(state, kind, { isGitProject });
+      if ("created" in next) {
+        setState(next);
+      }
+    },
+    [state, isGitProject, setState],
+  );
+
+  const onTreeFileOpen = useCallback(
+    (path: string, name: string) => {
+      setState(openSideTab(state, "file", { path, name }));
+    },
+    [state, setState],
+  );
+
+  const onToggleExpand = useCallback(() => {
+    const next = toggleSideExpanded(state);
+    setState(next);
+    onExpandedChange?.(next.expanded);
+  }, [state, setState, onExpandedChange]);
+
+  // Process-only plan tab: live plan auto-open, or a real planFocusKey bump
+  // (open-in-resources / review gate) even before a draft is visible.
+  // Initial focusKey 0 is unused — must not steal the empty picker.
+  useEffect(() => {
+    const { open, nextLastFocusKey } = shouldOpenPlanSideTab({
+      autoOpenEnabled: autoOpenPlanTab,
+      planVisible: !!plan?.visible,
+      focusKey: planFocusKey,
+      lastFocusKey: lastPlanFocusKey.current,
+    });
+    lastPlanFocusKey.current = nextLastFocusKey;
+    if (!open) return;
+    setState(openSideTab(state, "plan", { name: "side.tab.plan" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan?.visible, planFocusKey, autoOpenPlanTab]);
+
+  // Context open → ensure matching SideTab exists for file requests.
+  // Opening a file hides the tree so the preview is full-width.
+  useEffect(() => {
+    if (!openRequest) return;
+    if (openRequest.type === "file" && openRequest.path) {
+      setState({
+        ...openSideTab(state, "file", {
+          path: openRequest.path,
+          name: openRequest.title,
+          line: openRequest.line,
+          column: openRequest.column,
+        }),
+        treeVisible: false,
+      });
+    } else if (openRequest.type === "url" && openRequest.url) {
+      setState(
+        openSideTab(state, "browser", {
+          url: openRequest.url,
+          title: openRequest.title,
+          name: openRequest.title,
+        }),
+      );
+    } else if (openRequest.type === "changes") {
+      // Session tool edits do not require git — always open Review (#998).
+      setState(openSideTab(state, "review"));
+      const focus = (openRequest.path || "").trim();
+      if (focus) {
+        setReviewFocusPath(focus);
+        setReviewFocusToken((n) => n + 1);
+      }
+    }
+    onOpenRequestConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
+
+  return (
+    <div
+      className={"rp sw" + (state.expanded ? " sw--expanded" : "")}
+      data-testid="side-workbench"
+      data-expanded={state.expanded ? "true" : "false"}
+    >
+      <SideTabBar
+        locale={locale}
+        tabs={state.tabs}
+        activeId={state.activeId}
+        isGitProject={isGitProject}
+        projectPath={projectPath}
+        expanded={state.expanded}
+        dockComposer={dockComposer}
+        dirtyFilePaths={dirtyPaths}
+        onActivate={(id) => setState(setActiveSideTab(state, id))}
+        onCloseTab={requestCloseSideTab}
+        onCloseOtherTabs={(id) => requestBulkClose("others", id)}
+        onCloseAllTabs={() =>
+          requestBulkClose("all", state.activeId ?? state.tabs[0]?.id ?? "")
+        }
+        onCloseTabsToLeft={(id) => requestBulkClose("left", id)}
+        onCloseTabsToRight={(id) => requestBulkClose("right", id)}
+        onPickNew={pick}
+        onToggleExpand={onToggleExpand}
+        onToggleDockComposer={onToggleDockComposer}
+        onToggleSide={onCloseSide}
+        closeToggleInBar={closeToggleInBar}
+      />
+
+      <div className="sw__content">
+        {state.tabs.length === 0 || !active ? (
+          <div className="rp__empty-state sw__empty" data-testid="side-empty">
+            <SidePicker
+              locale={locale}
+              isGitProject={isGitProject}
+              onPick={pick}
+            />
+          </div>
+        ) : (
+          <>
+            {hasFileTabs ? (
+              <div
+                className="sw__files-host"
+                hidden={active.kind !== "file"}
+                aria-hidden={active.kind !== "file"}
+              >
+                <FilesWorkspace
+                  key={`${sshAlias || ""}:${projectPath || "orphan"}`}
+                  locale={locale}
+                  projectPath={projectPath}
+                  sshAlias={sshAlias}
+                  projectName={projectName}
+                  treeVisible={state.treeVisible}
+                  onTreeVisibleChange={(v) =>
+                    setState(setTreeVisible(state, v))
+                  }
+                  activePath={activeFilePath}
+                  activeLine={activeFileLine}
+                  activeColumn={activeFileColumn}
+                  onFileOpen={onTreeFileOpen}
+                  onDirtyPathsChange={setDirtyPaths}
+                  closePathRequest={
+                    closePathRequest
+                      ? {
+                          path: closePathRequest.path,
+                          token: closePathRequest.token,
+                        }
+                      : null
+                  }
+                  onClosePathResult={onClosePathResult}
+                  paneActive={paneActive && active.kind === "file"}
+                  sessionChanges={sessionChanges}
+                />
+              </div>
+            ) : null}
+
+            {active.kind === "review" ? (
+              <ReviewTab
+                locale={locale}
+                projectPath={projectPath}
+                sessionChanges={sessionChanges}
+                isGitProject={isGitProject}
+                onOpenFile={onTreeFileOpen}
+                focusPath={reviewFocusPathProp || reviewFocusPath}
+                focusToken={
+                  reviewFocusTokenProp > 0
+                    ? reviewFocusTokenProp
+                    : reviewFocusToken
+                }
+                pinnedFocusPaths={reviewPinnedPaths}
+              />
+            ) : null}
+
+            {active.kind === "plan" ? (
+              <PlanTab
+                locale={locale}
+                plan={plan}
+                planFocusKey={planFocusKey}
+                planChrome={planChrome}
+                onApprovePlan={onApprovePlan}
+                onRequestPlanChanges={onRequestPlanChanges}
+                onDismissPlan={onDismissPlan}
+                onOpenPlanHistory={onOpenPlanHistory}
+              />
+            ) : null}
+
+            {active.kind === "skills" ? (
+              <SkillsTab
+                locale={locale}
+                skills={skillInfos}
+                loading={skillsLoading}
+                hostError={skillsLoadError}
+                sshAlias={sshAlias}
+                onSelectSkill={(skill) => onSelectSkill?.(skill)}
+              />
+            ) : null}
+
+            {/* Keep browser/terminal instances mounted so PTY/xterm sessions
+                survive tab switches (VS Code-style). */}
+            {state.tabs
+              .filter((t) => t.kind === "browser" || t.kind === "terminal")
+              .map((tab) => {
+                const isActive = active.id === tab.id;
+                return (
+                  <div
+                    key={tab.id}
+                    className="sw__persist-host"
+                    hidden={!isActive}
+                    aria-hidden={!isActive}
+                    data-side-tab-id={tab.id}
+                    data-side-kind={tab.kind}
+                  >
+                    <SideTabBody
+                      locale={locale}
+                      tab={tab}
+                      projectPath={projectPath}
+                      sshAlias={sshAlias}
+                      active={paneActive && isActive}
+                    />
+                  </div>
+                );
+              })}
+          </>
+        )}
+      </div>
+
+      <GlassModal
+        open={!!bulkCloseConfirm}
+        onClose={() => setBulkCloseConfirm(null)}
+        title={tr("side.tabs.bulkCloseConfirmTitle")}
+        size="sm"
+        closeLabel={tr("common.close")}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setBulkCloseConfirm(null)}
+            >
+              {tr("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn--solid btn--danger"
+              data-testid="side-bulk-close-confirm"
+              onClick={() => {
+                const next = bulkCloseConfirm?.next;
+                setBulkCloseConfirm(null);
+                if (next) applyCloseState(next);
+              }}
+            >
+              {tr("side.tabs.bulkCloseConfirmAction")}
+            </button>
+          </>
+        }
+      >
+        <p className="rp-modal-copy">
+          {tr("side.tabs.bulkCloseConfirm" as MessageKey, {
+            dirty: String(bulkCloseConfirm?.dirtyCount ?? 0),
+            total: String(bulkCloseConfirm?.totalCount ?? 0),
+          })}
+        </p>
+      </GlassModal>
+    </div>
+  );
+}
+
+export function openSideWorkbenchFile(
+  state: SideWorkbenchState,
+  path: string,
+  name?: string,
+): SideWorkbenchState {
+  return openSideTab(state, "file", { path, name });
+}
+
+export function openSideWorkbenchBrowser(
+  state: SideWorkbenchState,
+  url: string,
+  title?: string,
+): SideWorkbenchState {
+  return openSideTab(state, "browser", { url, title, name: title });
+}
+
+export function openSideWorkbenchReview(
+  state: SideWorkbenchState,
+): SideWorkbenchState {
+  return openSideTab(state, "review");
+}
+
+export function openSideWorkbenchSkills(
+  state: SideWorkbenchState,
+): SideWorkbenchState {
+  return openSideTab(state, "skills");
+}

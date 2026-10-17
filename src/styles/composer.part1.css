@@ -1,0 +1,1374 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+
+.cmm__row:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.cmm__row-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-primary);
+  font-weight: 500;
+  min-width: 0;
+  /* Default menus may still ellipsis; model menu overrides below. */
+  max-width: min(280px, 70%);
+}
+
+.cmm__row-val-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/*
+ * Model menu is portaled to body — styles must target `.cmm__pop--model`
+ * (panel), not `.cmm--model` (trigger root outside the portal).
+ * Compact dropdown: fixed width, ellipsis long ids (title still has the full
+ * string). Do not grow with the longest custom model id.
+ */
+.cmm__pop.cmm__pop--model {
+  width: 280px;
+  max-width: min(280px, calc(100vw - 16px));
+  max-height: min(52vh, calc(100vh - 88px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  transform-origin: bottom center;
+  animation: none;
+  opacity: 0;
+  transform: scaleY(0.2);
+}
+
+.cmm__pop.cmm__pop--model.is-in {
+  animation: cmm-pop-up var(--motion-pane) var(--motion-pane-ease) both;
+}
+
+.cmm__pop.cmm__pop--model.is-out {
+  animation: cmm-pop-up var(--motion-pane) var(--motion-pane-ease) reverse both;
+}
+
+@keyframes cmm-pop-up {
+  from {
+    opacity: 0;
+    transform: scaleY(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cmm__pop--model .cmm__row {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+}
+
+.cmm__pop--model .cmm__row-val {
+  max-width: 46%;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.cmm__pop--model .cmm__row-val-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmm__pop--model .cmm__opt-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.cmm__pop--model .cmm__opt-desc {
+  display: none;
+}
+
+.cmm__pop--model .cmm__opt,
+.cmm__pop--model .cmm__search,
+.cmm__pop--flyout .cmm__opt,
+.cmm__pop--flyout .cmm__search {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cmm__pop--model .cmm__opt,
+.cmm__pop--effort .cmm__opt,
+.cmm__pop--flyout .cmm__opt {
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.cmm__pop--model .cmm__row.is-fly {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Combined model chip: Effort popover (Claude desktop) + Advanced. */
+.cmm__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 8px;
+}
+
+.cmm__simple-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cmm__hub-body {
+  display: none;
+  flex-direction: column;
+}
+
+.cmm__stage.is-hub .cmm__simple-body {
+  display: none;
+}
+
+.cmm__stage.is-hub .cmm__hub-body {
+  display: flex;
+  animation: cmm-hub-in var(--motion-pane) var(--motion-pane-ease);
+}
+
+.cmm__stage.is-hub .cmm__advanced {
+  order: -1;
+  align-self: flex-end;
+}
+
+@keyframes cmm-hub-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Tertiary flyout sits on the same floating layer as the Advanced hub.
+ * Shadows are biased away from the hub so the two cards do not stain
+ * each other. Left placement pins the inner edge (CSS `right`) so the
+ * gap matches the right-side layout.
+ */
+.cmm__pop.cmm__pop--model.cmm__pop--hub,
+.cmm__pop.cmm__pop--portal.cmm__pop--flyout {
+  isolation: auto;
+  /* Downward-biased shadow so hub + flyout stay coplanar (no side stain). */
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--text-primary) 10%, transparent) inset,
+    0 10px 22px color-mix(in srgb, #000 18%, transparent);
+}
+
+.cmm__pop.cmm__pop--portal.cmm__pop--flyout {
+  width: max-content;
+  min-width: 168px;
+  max-width: 220px;
+  padding: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transform: translateZ(0);
+  animation: cmm-fly-in-right var(--motion-pane) var(--motion-pane-ease) both;
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--text-primary) 10%, transparent) inset,
+    8px 10px 22px color-mix(in srgb, #000 16%, transparent);
+}
+
+/* Context-window editor: keep input + Save on one readable row. */
+.cmm__pop.cmm__pop--portal.cmm__pop--flyout[data-kind="window"] {
+  min-width: 220px;
+  max-width: 280px;
+}
+
+.cmm__pop.cmm__pop--portal.cmm__pop--flyout[data-side="left"] {
+  animation-name: cmm-fly-in-left;
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--text-primary) 10%, transparent) inset,
+    -8px 10px 22px color-mix(in srgb, #000 16%, transparent);
+}
+
+.cmm__pop.cmm__pop--flyout-models {
+  width: 220px;
+  min-width: 168px;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cmm__flyout-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.cmm__flyout-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.cmm__pop--flyout .cmm__search {
+  padding: 2px 2px 6px;
+}
+
+.cmm__pop--flyout .cmm__search-input {
+  height: 28px;
+  font-size: 12px;
+}
+
+.cmm__pop--flyout .cmm__section {
+  padding: 4px 8px 2px;
+}
+
+.cmm__pop--flyout .cmm__opt-check {
+  margin-top: 0;
+}
+
+.cmm__pop--flyout .cmm__opt-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes cmm-fly-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateZ(0);
+  }
+}
+
+@keyframes cmm-fly-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(6px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateZ(0);
+  }
+}
+
+.cmm__simple-head {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.cmm__simple-title {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cmm__simple-title.is-ultra,
+.cmm--extra .cmm__trigger,
+.cmm--extra.is-open .cmm__trigger,
+.cmm--extra .cmm__trigger:hover {
+  color: #c4a0ff;
+}
+
+[data-theme="light"] .cmm__simple-title.is-ultra,
+[data-theme="light"] .cmm--extra .cmm__trigger,
+[data-theme="light"] .cmm--extra.is-open .cmm__trigger,
+[data-theme="light"] .cmm--extra .cmm__trigger:hover {
+  color: #7c4dff;
+}
+
+.cmm__advanced {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  align-self: flex-end;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.cmm__advanced:hover {
+  color: var(--text-primary);
+}
+
+.cmm__row-val-text.is-ultra,
+.cmm__opt-title.is-ultra {
+  color: #c4a0ff;
+}
+
+[data-theme="light"] .cmm__row-val-text.is-ultra,
+[data-theme="light"] .cmm__opt-title.is-ultra {
+  color: #7c4dff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmm__stops-rail,
+  .cmm__stops-thumb,
+  .composer__model-bar {
+    transition: none;
+  }
+  .cmm__pop.cmm__pop--model,
+  .cmm__pop.cmm__pop--flyout,
+  .cmm__stage.is-hub .cmm__hub-body {
+    animation: none;
+  }
+  .cmm__advanced {
+    transition: none;
+  }
+}
+
+/* Claude desktop Effort popover: capsule track, dots, sliding pill. */
+.cmm__stops {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cmm__stops-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+@property --cmm-stop-t {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.cmm__stops-rail {
+  --cmm-thumb: 28px;
+  position: relative;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  cursor: pointer;
+  touch-action: none;
+  transition: --cmm-stop-t var(--motion-pane) var(--motion-pane-ease);
+}
+
+.cmm__stops-dots {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 8px;
+  pointer-events: none;
+}
+
+.cmm__stops-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-primary) 28%, transparent);
+}
+
+.cmm__stops-dot.is-active {
+  opacity: 0;
+}
+
+.cmm__stops-dot.is-ultra {
+  background: #c4a0ff;
+}
+
+.cmm__stops-thumb {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  height: 20px;
+  width: var(--cmm-thumb);
+  border-radius: 12px;
+  background: var(--bg-elevated, #fff);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.16);
+  left: calc(
+    6px + (100% - 12px - var(--cmm-thumb)) * var(--cmm-stop-t, 0)
+  );
+  pointer-events: none;
+  transition: background var(--motion-fast) ease;
+}
+
+.cmm__stops-thumb.is-ultra {
+  background: #c4a0ff;
+}
+
+.cmm__stops-hit {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+[data-theme="light"] .cmm__stops-rail {
+  background: #e6e4df;
+}
+
+[data-theme="light"] .cmm__stops-thumb {
+  background: #fff;
+}
+
+[data-theme="light"] .cmm__stops-dot.is-ultra,
+[data-theme="light"] .cmm__stops-thumb.is-ultra {
+  background: #7c4dff;
+}
+
+/*
+ * Access menu (mode | permission) — compact dual-column dropdown.
+ * Portaled panel class `.cmm__pop--access` (not trigger `.cmm--access`).
+ * Descriptions stay in the DOM for a11y; visually title-only.
+ */
+.cmm__pop.cmm__pop--access {
+  width: 300px;
+  min-width: 0;
+  max-width: min(300px, calc(100vw - 16px));
+  padding: 4px 6px 8px;
+  overflow-x: hidden;
+}
+
+.cmm__pop--access .cmm__header {
+  padding: 4px 8px 2px;
+}
+
+.cmm__pop--access .cmm__header-title {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.cmm__access-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 0;
+  align-items: start;
+}
+
+.cmm__access-col {
+  min-width: 0;
+  padding: 0 4px;
+}
+
+.cmm__access-col + .cmm__access-col {
+  border-left: 1px solid var(--border-subtle);
+  padding-left: 8px;
+}
+
+.cmm__pop--access .cmm__section {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-tertiary);
+}
+
+/* Compact option rows for dual columns */
+.cmm__opt--access {
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 8px;
+}
+
+.cmm__opt--access .cmm__opt-icon {
+  margin-top: 0;
+}
+
+.cmm__opt--access .cmm__opt-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.cmm__opt--access .cmm__opt-title {
+  font-size: 12.5px;
+  font-weight: 550;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmm__opt--access .cmm__opt-desc {
+  display: none;
+}
+
+.cmm__opt--access .cmm__opt-check {
+  margin-top: 0;
+}
+
+.cmm__opt--access .cmm__opt-check svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Narrow viewports: stack mode above permission */
+@media (max-width: 520px) {
+  .cmm__pop.cmm__pop--access {
+    width: min(280px, calc(100vw - 16px));
+    min-width: 0;
+  }
+
+  .cmm__access-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .cmm__access-col + .cmm__access-col {
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 4px;
+    padding-top: 6px;
+    padding-left: 4px;
+  }
+}
+
+.cmm__search {
+  padding: 4px 6px 6px;
+}
+
+.cmm__search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.cmm__search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.cmm__search-input:focus {
+  outline: none;
+  border-color: var(--border-focus, var(--accent, #6b8cff));
+}
+
+/* Hide native search clear on WebKit so layout stays tight in the menu. */
+.cmm__search-input::-webkit-search-decoration,
+.cmm__search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.cmm__window-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 6px 6px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.cmm__window-edit__label {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  padding: 0 2px;
+}
+
+.cmm__inline-edit {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.cmm__inline-edit input {
+  flex: 1 1 0;
+  min-width: 0;
+  /* type=number carries an intrinsic minimum width in some engines (notably
+     WKWebView); width:0 lets flex ignore it so the Save button always fits. */
+  width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+.cmm__inline-edit input:focus {
+  border-color: var(--border-focus, var(--accent, #6b8cff));
+}
+.cmm__inline-save {
+  flex: 0 0 auto;
+  min-width: 52px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  background: var(--accent, #6b8cff);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cmm__inline-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cmm__inline-save:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+
+.cmm__opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.cmm__opt:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.cmm__opt.is-active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.cmm__opt.is-danger,
+.cmm__opt.is-danger .cmm__opt-title {
+  color: var(--danger, #e07040);
+}
+
+.cmm__opt.is-danger .cmm__opt-icon {
+  color: var(--danger, #e07040);
+}
+
+.cmm__opt-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--text-tertiary);
+}
+
+.cmm__opt-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cmm__opt-title {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.cmm__opt-desc {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.cmm__opt-check {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.cmm__opt.is-active .cmm__opt-check {
+  color: var(--text-primary);
+}
+
+/* ===== Resource viewer (right pane) ===== */
+.rv {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Match .main__top / .sidebar-chrome — one shared titlebar height + divider Y */
+.rv__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: var(--titlebar-height, 40px);
+  min-height: var(--titlebar-height, 40px);
+  max-height: var(--titlebar-height, 40px);
+  padding: 0 10px 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.rv__head-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.rv__head-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.rv__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.rv__search {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.rv__search input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.rv__error {
+  margin: 8px 10px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--danger-muted);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.rv__tree,
+.rv__tree--full {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rv__preview,
+.rv__preview--full {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rv__preview-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.rv__tree-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Nested code / media previews — native bar already globally hidden */
+.rv-preview__code,
+.rv-preview__csv,
+.rv-preview__office,
+.rv-preview__md,
+.rv-preview__svg {
+  overflow: auto;
+}
+
+.rv--preview-mode .rv__preview {
+  border: none;
+}
+
+.rv__section-label {
+  padding: 10px 12px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.rv__empty {
+  padding: 16px 12px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.rv-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  padding-right: 10px;
+  border-radius: 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.rv-tree__row:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.rv-tree__row.is-active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.rv-tree__chev {
+  width: 14px;
+  display: inline-flex;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.rv-tree__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  opacity: 0.5;
+}
+
+.rv-tree__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.rv-tree__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv-tree__meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.rv-preview__code,
+.rv-preview__csv,
+.rv-preview__office {
+  margin: 0;
+  padding: 12px 14px 20px;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: auto;
+}
+
+.rv-preview__md {
+  padding: 12px 14px 20px;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.rv-preview__md .md-body {
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.rv-preview__img.md-body__img-frame,
+.rv-preview__img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: none;
+  margin: 8px auto;
+  border-radius: 6px;
+  cursor: zoom-in;
+}
+
+.rv-preview__svg {
+  padding: 12px;
+  overflow: auto;
+}
+
+.rv-preview__svg svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.rv-preview__frame {
+  flex: 1;
+  width: 100%;
+  min-height: 200px;
+  border: none;
+  background: var(--bg-elevated);
+}
+
+.rv-preview__media {
+  width: calc(100% - 24px);
+  margin: 12px;
+}
+
+/* Plyr local media player */
+.file-media {
+  width: 100%;
+  padding: 8px 10px 12px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.file-media--video {
+  min-height: 180px;
+}
+
+.file-media--audio {
+  padding-top: 24px;
+}
+
+.file-media__host {
+  width: 100%;
+}
+
+.file-media .plyr {
+  --plyr-color-main: var(--accent);
+  --plyr-video-background: var(--bg-code);
+  --plyr-audio-controls-background: var(--glass-surface-solid);
+  --plyr-audio-control-color: var(--text-primary);
+  --plyr-menu-background: var(--glass-surface-solid);
+  --plyr-menu-color: var(--text-primary);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.file-media--video .plyr {
+  width: 100%;
+}
+
+.file-media__el {
+  width: 100%;
+  max-height: min(70vh, 520px);
+}
+
+.file-media__error {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger, #e5484d) 10%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--danger, #e5484d) 28%, var(--border-subtle));
+  color: var(--text-secondary);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.file-media__error p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.file-media__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.file-media__open-ext {
+  font-size: 12.5px;
+}
+
+.rv-preview__msg {
+  padding: 16px 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.rv-preview__meta {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* ===== Hide native scrollbars by default (system track is hard to clear) =====
+   Primary panes use <OverlayScroll> floating thumbs.
+   Textareas use a local native exception below (cannot wrap OverlayScroll). */
+*:not(textarea) {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important;
+}
+
+*:not(textarea)::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* --- Textarea / composer input: native scroll, thumb-only look --- */
+textarea,
+textarea.composer__input,
+.composer__input {
+  scrollbar-width: thin !important;
+  scrollbar-color: transparent transparent !important;
+  -ms-overflow-style: auto !important;
+}
+
+textarea:hover,
+textarea:focus,
+textarea:focus-visible,
+textarea.composer__input:hover,
+textarea.composer__input:focus,
+textarea.composer__input:focus-visible,
+.composer__input:hover,
+.composer__input:focus,
+.composer__input:focus-visible {
+  scrollbar-color: var(--scrollbar-thumb) transparent !important;
+}
+
+textarea::-webkit-scrollbar,
+textarea.composer__input::-webkit-scrollbar,
+.composer__input::-webkit-scrollbar {
+  display: block !important;
+  width: var(--scrollbar-size, 8px) !important;
+  height: var(--scrollbar-size, 8px) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+textarea::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-track-piece,
+textarea::-webkit-scrollbar-corner,
+textarea.composer__input::-webkit-scrollbar-track,
+textarea.composer__input::-webkit-scrollbar-track-piece,
+textarea.composer__input::-webkit-scrollbar-corner,
+.composer__input::-webkit-scrollbar-track,
+.composer__input::-webkit-scrollbar-track-piece,
+.composer__input::-webkit-scrollbar-corner {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+textarea::-webkit-scrollbar-button,
+.composer__input::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+textarea::-webkit-scrollbar-thumb,
+textarea.composer__input::-webkit-scrollbar-thumb,
+.composer__input::-webkit-scrollbar-thumb {
+  background-color: transparent !important;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background-clip: padding-box !important;
+  min-height: 28px;
+}
+
+textarea:hover::-webkit-scrollbar-thumb,
+textarea:focus::-webkit-scrollbar-thumb,
+textarea:focus-visible::-webkit-scrollbar-thumb,
+textarea.composer__input:hover::-webkit-scrollbar-thumb,
+textarea.composer__input:focus::-webkit-scrollbar-thumb,
+.composer__input:hover::-webkit-scrollbar-thumb,
+.composer__input:focus::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb) !important;
+  background-clip: padding-box !important;
+}
+
+textarea:hover::-webkit-scrollbar-thumb:hover,
+textarea:focus::-webkit-scrollbar-thumb:hover,
+.composer__input:hover::-webkit-scrollbar-thumb:hover,
+.composer__input:focus::-webkit-scrollbar-thumb:hover,
+textarea::-webkit-scrollbar-thumb:active,
+.composer__input::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-hover) !important;
+}
+
+/* Custom floating thumb (no rail/track paint) — see OverlayScroll.tsx */
+.overlay-scroll {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.overlay-scroll__viewport {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+.overlay-scroll__rail {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  bottom: 0;
+  width: calc(var(--scrollbar-size, 8px) + 4px);
+  pointer-events: none;
+  z-index: 5;
+  background: transparent; /* no track */
+}
+
+.overlay-scroll__thumb {
+  position: absolute;
+  right: 2px;
+  width: var(--scrollbar-thumb-width, 6px);
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  opacity: 0;
+  transition: opacity 140ms ease, background 120ms ease;
+  pointer-events: none;
+}
+
+.overlay-scroll:hover .overlay-scroll__thumb,
+.overlay-scroll.is-scrolling .overlay-scroll__thumb {
+  opacity: 1;
+}
+
+.overlay-scroll:hover .overlay-scroll__thumb,
+.overlay-scroll.is-scrolling .overlay-scroll__thumb {
+  background: var(--scrollbar-thumb);
+}
+
+.overlay-scroll.is-scrolling .overlay-scroll__thumb {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* ── Settings account segment tabs ───────────────────────────────────────── */
+.settings-account-tabs {
+  margin: 0 0 18px;
+}
+
+.settings-seg--lg {
+  padding: 4px;
+  gap: 4px;
+}
+
+.settings-seg--lg .settings-seg__btn {
+  height: 34px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.settings-account-tabs__hint {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  max-width: 52ch;
+}
+
+/* ── Official aux inject (providers panel) ───────────────────────────────── */
+.prov-official-aux {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 18px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+}
+
+.prov-official-aux.is-disabled > :is(
+  .prov-official-aux__text,
+  .prov-official-aux__switch
+) {
+  opacity: 0.72;
+}
+
+.prov-official-aux__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.prov-official-aux__desc {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  max-width: 52ch;
+}
+
+.prov-official-aux__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.prov-official-aux__switch input:disabled {
+  cursor: not-allowed;
+}
+
+.prov-official-aux.is-disabled .prov-official-aux__switch {
+  cursor: not-allowed;
+}
+
+/* ── Providers panel: left list + right detail/form ──────────────────────── */
+.prov-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Floor when not height-constrained; pane-fill overrides to 0 */
+  min-height: 360px;
+}
+
+.settings-page__main--pane-fill > .prov-panel {
+  min-height: 0;
+  overflow: hidden;
+  /* 0-basis: leftover pane height, not the provider-list max-content. */
+  flex: 1 1 0%;
+}
+
+.prov-panel > .prov-alert {
+  flex-shrink: 0;
+}
+
+.prov-loading {
+  padding: 24px 8px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.prov-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--danger-muted, color-mix(in srgb, var(--danger) 12%, transparent));
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+.prov-split {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  /* Floor when not height-constrained; pane-fill overrides to 0 */
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.settings-page__main--pane-fill .prov-split {
+  min-height: 0;
+  flex: 1 1 0%;
+}
+
+/*
+ * Desktop pane-fill: implicit auto rows size to max(list, form) and overflow
+ * the clipped parent, so .prov-rail never becomes a scrollport. minmax(0, 1fr)
+ * caps the row to the panel. Narrow stacked layout (part3) keeps two rows.
+ */
+@media (min-width: 861px) {
+  .settings-page__main--pane-fill .prov-split {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .settings-page__main--pane-fill .prov-split__list,
+  .settings-page__main--pane-fill .prov-split__detail {
+    height: 100%;
+    max-height: 100%;
+  }
+}
+
+.prov-split__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.prov-list-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}

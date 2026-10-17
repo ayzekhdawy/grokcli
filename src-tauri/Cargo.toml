@@ -1,0 +1,157 @@
+[package]
+name = "grok-app"
+version = "0.2.41"
+description = "Grok — desktop workbench for Grok Build CLI"
+authors = ["RongleCat"]
+edition = "2021"
+
+[lib]
+name = "grok_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# `unstable` — multi-webview (resource pane embedded browser)
+# `macos-private-api` — required by tauri.macos.conf.json `macOSPrivateApi: true`
+#   (transparent titlebar + window-vibrancy). Keep the feature on all targets so
+#   cargo-xwin Windows cross-builds pass tauri-build feature allowlist checks;
+#   runtime effect is macOS-only.
+tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
+tauri-plugin-store = "2"
+# Second launch focuses existing window (Dock multi-open reports).
+tauri-plugin-single-instance = "2"
+tauri-plugin-deep-link = "2"
+# In-app auto-update. Hard dependency: Tauri ACL discovers updater:allow-* from
+# this crate at build time (capabilities/default.json). Runtime registration is
+# still gated by build.rs cfg(grok_updater_enabled) + non-debug — local dev
+# never hits a production endpoint. Making this optional breaks `cargo check`
+# without --features because permissions would not exist.
+tauri-plugin-updater = "2"
+# Relaunch after updater install (always needed for install-and-restart UX).
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Trimmed from "full": no `tokio::fs` / `tokio::signal` usage in this crate
+# (file IO goes through `spawn_blocking` + `std::fs`). Add a feature here
+# only when a new `tokio::<feature>::…` call site actually appears.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "process", "io-util", "net"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+parking_lot = "0.12"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+directories = "6"
+which = "7"
+chrono = { version = "0.4", features = ["serde", "clock"] }
+# `socks` so socks5 / socks5h Manual + system SOCKS paths work for Host HTTP
+# (without it, Proxy::all("socks5://…") fails and traffic falls back to direct —
+# a common reason users think only TUN "applies" the proxy).
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart", "system-proxy", "blocking", "socks"] }
+futures-util = "0.3"
+bytes = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "http1", "tokio"] }
+ipnet = "2"
+percent-encoding = "2"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+webpki-roots = "1"
+base64 = "0.22"
+sha1 = "0.10"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+rfd = "0.15"
+window-vibrancy = "0.6"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+# OS secret store: macOS Keychain / Windows Credential Manager / Linux Secret Service.
+# No default features — enable platform stores explicitly; file fallback lives in secrets.rs.
+keyring = { version = "3.6", features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+    "crypto-rust",
+] }
+arboard = "3"
+# jpeg/gif/webp: chat image thumb disk cache (image_thumb.rs)
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+fs2 = "0.4"
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+url = "2"
+scraper = "0.27"
+
+# Remote mirror host (HTTP + WS + token gate) — see src/mirror/
+axum = { version = "0.8", features = ["ws", "macros"] }
+# SSE frame filter stream for OpenCode/Zen reverse proxy (relay_stream_proxy).
+async-stream = "0.3"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "trace"] }
+rand = "0.8"
+tracing-appender = "0.2"
+# Read-only import from CC Switch (`~/.cc-switch/cc-switch.db`).
+rusqlite = { version = "0.32", features = ["bundled"] }
+tauri-plugin-autostart = "2"
+portable-pty = "0.9.0"
+tauri-plugin-notification = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Windows system proxy (WinINET registry) for child-process env injection — NEW-02.
+# `windows` — shell integration (AUMID, Show Desktop / taskbar styles) in win_shell.rs.
+# `tauri-winrt-notification` — toast click (`on_activated`); the notification
+# plugin's desktop path is fire-and-forget and drops `extra`.
+[target.'cfg(windows)'.dependencies]
+clipboard-win = "5"
+winreg = "0.55"
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Kernel",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_System_Pipes",
+    "Win32_System_SystemServices",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+# COM `#[implement(IDropTarget)]` for late Windows file-drop (#1017).
+windows-core = "0.61"
+tauri-winrt-notification = "0.7"
+# Same crate Tauri uses — mark Ctrl+Tab as not a browser accelerator so JS sees it.
+webview2-com = "0.38"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+notify-rust = "4"
+# Same gtk as Tauri — hide the app menubar on the pet overlay (KDE/GTK
+# reapplies Edit/Window/Help to every ApplicationWindow).
+gtk = { version = "0.18", features = ["v3_24"] }
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-window-state = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+mac-notification-sys = "0.6"
+mac-usernotifications = "0.3"
+# Pet overlay: setPreventsActivation. Launch: NSApp.isActive / firstResponder.
+objc2 = "0.6"
+# Local NSEvent monitor for Doubao Fn / Globe voice → IME (#1030).
+block2 = "0.6"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+# Must be "unwind" (not "abort"): media:// workers wrap handler +
+# UriSchemeResponder::respond in catch_unwind so a single Range/WebKit race
+# cannot SIGABRT the whole desktop process. panic=abort makes catch_unwind
+# a no-op and was the residual crash path after 0.2.1 pool hardening.
+panic = "unwind"
+strip = true

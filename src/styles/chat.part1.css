@@ -1,0 +1,911 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+.plan-review__scroll {
+  flex: 1;
+  min-height: 0;
+}
+.plan-review__body {
+  padding: 16px 18px 28px;
+  max-width: 720px;
+}
+.plan-review__md {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.plan-review__empty {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.plan-review__empty--waiting {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* PLAN-MODE-PRO — Resources → Plan contextual empty */
+.plan-resource-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 28px 24px;
+  max-width: 28rem;
+}
+.plan-resource-empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.plan-resource-empty__hint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.plan-resource-empty__cta {
+  margin-top: 8px;
+}
+.plan-resource-empty--plan_mode .plan-resource-empty__title {
+  color: var(--accent);
+}
+.plan-resource-empty--disabled .plan-resource-empty__hint {
+  color: var(--text-tertiary);
+}
+.plan-resource-empty--user_closed .plan-resource-empty__hint {
+  color: var(--text-tertiary);
+}
+.plan-review__steps {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.plan-review__steps-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.plan-review__steps-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plan-review__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.plan-review__step-status {
+  flex-shrink: 0;
+  width: 1.1em;
+  color: var(--accent);
+  opacity: 0.85;
+}
+.plan-review__step--completed .plan-review__step-text {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: var(--border-strong);
+}
+.plan-review__step--cancelled {
+  opacity: 0.55;
+}
+
+/* Thread plan card (compact preview; full review in resources) */
+.lobe-chat-plan {
+  max-width: 720px;
+  margin: 8px 0 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 36%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-card, var(--bg-elevated)));
+}
+.lobe-chat-plan__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.lobe-chat-plan__status {
+  font-weight: 600;
+  color: var(--accent);
+}
+.lobe-chat-plan__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.lobe-chat-plan__body {
+  max-height: 12rem;
+  overflow: auto;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.lobe-chat-plan__empty {
+  margin: 0;
+  color: var(--text-tertiary);
+}
+.lobe-chat-plan__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Plan card (reference) */
+.plan-card {
+  max-width: 720px;
+  margin: var(--space-3) auto;
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border-radius: 14px;
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-pop);
+}
+
+.plan-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--warning);
+  margin-bottom: var(--space-2);
+}
+
+.plan-card__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+  color: var(--text-primary);
+}
+
+.plan-card__h {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.plan-card__body {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: var(--space-4);
+}
+
+.plan-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/*
+ * Permission card — sits above the floating composer (same column width).
+ * Monochrome: noticeable but not alarm-orange.
+ */
+.perm-bar {
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  width: 100%;
+  max-width: var(--chat-width-max, 800px);
+  margin: 0 auto;
+  padding: 10px 12px;
+  border-radius: var(--modal-radius, 16px);
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  transform: translateZ(0);
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+[data-theme="light"] .perm-bar {
+  box-shadow: var(--glass-shadow);
+}
+
+.perm-bar__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.perm-bar__badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-hover);
+}
+
+.perm-bar__tool {
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perm-bar__countdown {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.perm-bar__preview {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  max-height: 4.6em; /* ~3 lines */
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.perm-bar__actions {
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.perm-bar__btn {
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  appearance: none;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 6px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.perm-bar__btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.perm-bar__btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.perm-bar__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
+.perm-bar__btn--allow {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--text-inverse);
+}
+
+.perm-bar__btn--allow:hover {
+  background: var(--text-primary);
+  opacity: 0.9;
+}
+
+.perm-bar__btn--session {
+  color: var(--text-secondary);
+}
+
+.perm-bar__btn--deny {
+  color: var(--text-tertiary);
+}
+
+.perm-bar__btn--deny:hover {
+  color: var(--text-primary);
+}
+
+/* In-thread turn notice — soft Codex-like pill (not a red alert box) */
+.chat-turn-error {
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 4px 0 8px;
+  border: none;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.chat-turn-error__label {
+  display: none;
+}
+
+.chat-turn-error__body {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.chat-turn-error__icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0.85;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
+}
+
+.chat-turn-error__body .md-body {
+  font-size: 13px;
+  line-height: 1.45;
+  color: inherit;
+}
+
+/* Stream stall banner (I06) — soft warning; keep waiting is primary */
+.stall-banner--soft {
+  border-color: color-mix(in srgb, var(--warning, #e6b84d) 55%, transparent);
+  background: color-mix(in srgb, var(--warning, #e6b84d) 12%, var(--bg-elevated, #1a1a1a));
+}
+
+.stall-banner {
+  margin: 0 var(--space-5) var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--warning-muted);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+/* Secondary multi-window: live tip + focus main (not an error). */
+.view-only-banner {
+  margin: 0 var(--space-5) var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent, #6b8afd) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #6b8afd) 35%, transparent);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.view-only-banner__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+
+.view-only-banner__copy {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.view-only-banner__title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.view-only-banner__body {
+  color: var(--text-secondary, var(--text-primary));
+  opacity: 0.92;
+}
+
+.view-only-banner__action {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Prefer warning palette even when combined with error-banner utility classes. */
+.stall-banner.error-banner {
+  background: var(--warning-muted);
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+}
+
+.stall-banner__summary {
+  flex: 1 1 220px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.stall-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.stall-banner__btn {
+  height: 28px;
+  font-size: 12px;
+}
+
+.stall-banner__btn--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.stall-banner__btn--danger:hover {
+  filter: brightness(1.05);
+}
+
+/* Error banner — compact summary; full dump behind Details */
+.error-banner {
+  margin: 0 var(--space-5) var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--danger-muted);
+  border: 1px solid var(--danger);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  /* App chrome is user-select:none; errors must stay copyable. */
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+.error-banner button,
+.error-banner button * {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.error-banner__code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--danger);
+  margin-bottom: 4px;
+}
+
+.error-banner__summary {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.error-banner__cause {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.error-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.error-banner__primary {
+  height: 28px;
+  font-size: 12px;
+}
+
+.error-banner__secondary {
+  height: 28px;
+  font-size: 12px;
+}
+
+.error-banner__details-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.error-banner__details-btn:hover {
+  opacity: 1;
+}
+
+.error-banner__reconnect {
+  height: 28px;
+  font-size: 12px;
+}
+
+.error-banner__detail {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-base) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary);
+}
+
+/* Composer — floating over chat; messages scroll underneath */
+.composer-wrap {
+  padding: 12px 16px 16px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.composer-wrap--float {
+  position: absolute;
+  left: 0;
+  /* Overlay aside may cover the right edge; never shrink the wrap to 0. */
+  right: min(
+    var(--sw-aside-occupied, 0px),
+    max(0px, calc(100% - 360px))
+  );
+  bottom: 0;
+  z-index: 20;
+  /* Only the card captures pointer; chat remains scrollable underneath. */
+  pointer-events: none;
+  padding: 28px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Empty / new session: composer sits in the lower half; SuperGrok + prompt
+ * stay centered in the free space above it (same idea as phone). */
+.composer-wrap--welcome {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: min(
+    var(--sw-aside-occupied, 0px),
+    max(0px, calc(100% - 360px))
+  );
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 22px;
+  padding: 24px 20px;
+  padding-top: max(48px, 8vh);
+  padding-bottom: max(72px, 14vh);
+}
+
+/* Wallpaper clicks pass through the wrap onto .lobe-chat (user-select:text).
+ * WKWebView then draws native selection carets on the empty transcript. */
+.main__stage:has(.composer-wrap--welcome) .lobe-chat,
+.main__stage:has(.composer-wrap--welcome) .lobe-chat * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.composer-wrap--float .composer-stack {
+  pointer-events: auto;
+}
+
+.composer-wrap--welcome .composer-welcome-mark {
+  flex: 1 1 auto;
+  min-height: 0;
+  justify-content: center;
+}
+
+.composer-wrap--welcome .composer,
+.composer-wrap--welcome .composer-stack {
+  width: 100%;
+  max-width: var(--chat-width-max, 800px);
+  flex-shrink: 0;
+}
+
+.composer-welcome-mark {
+  pointer-events: none;
+  position: relative;
+  width: 100%;
+  max-width: var(--chat-width-max, 800px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 8px 8px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.composer-welcome-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  transform: translate3d(0, 0, 0);
+}
+
+.composer-welcome-prompt {
+  width: max-content;
+  max-width: calc(100% - 32px);
+  color: var(--text-primary);
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  background: none;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  clip-path: none;
+}
+
+.composer-welcome-mark.is-entering .composer-welcome-brand {
+  animation: composer-welcome-brand-rise 480ms ease both;
+  will-change: transform;
+}
+
+.composer-welcome-mark.is-entering .composer-welcome-prompt {
+  animation: composer-welcome-prompt-type
+    680ms
+    steps(var(--welcome-prompt-steps), end)
+    480ms
+    both;
+}
+
+@keyframes composer-welcome-brand-rise {
+  from {
+    transform: translate3d(0, calc(100% + 12px), 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes composer-welcome-prompt-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-welcome-mark.is-entering .composer-welcome-brand,
+  .composer-welcome-mark.is-entering .composer-welcome-prompt {
+    animation: none;
+  }
+}
+
+/* SuperGrok / SuperGrok Heavy wordmarks (theme via data-theme tokens).
+ * Inline SVG — no image fetch; paint should be immediate once mounted. */
+.supergrok-mark {
+  display: block;
+  height: auto;
+  max-width: min(280px, 72vw);
+  color: var(--text-primary);
+  /* Avoid FOUC-style fade; logo should snap in */
+  opacity: 1;
+}
+
+.supergrok-mark--standard {
+  width: min(168px, 48vw);
+}
+
+.supergrok-mark--heavy {
+  width: min(280px, 78vw);
+}
+
+.supergrok-mark__ink {
+  fill: currentColor;
+}
+
+/* HEAVY pill — matches official light/dark treatment (Image reference) */
+.supergrok-mark__badge {
+  fill: #313235;
+}
+
+.supergrok-mark__badge-stroke {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 1;
+}
+
+.supergrok-mark__badge-text {
+  fill: #b5b5b5;
+}
+
+[data-theme="light"] .supergrok-mark__badge {
+  fill: #f3f3f1;
+}
+
+[data-theme="light"] .supergrok-mark__badge-stroke {
+  stroke: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .supergrok-mark__badge-text {
+  fill: #646362;
+}
+
+/* Preset provider wordmarks on the welcome composer (DeepSeek / OpenCode / Ark / Zhipu).
+ * DeepSeek keeps its brand blue in light mode and flips to white in dark
+ * mode; OpenCode is monochrome — black in light mode, white in dark mode.
+ * Volcengine Ark uses brand icon colors + theme-aware label ink. */
+.deepseek-full-mark__ink {
+  fill: #4d6bfe;
+}
+
+[data-theme="dark"] .deepseek-full-mark__ink {
+  fill: #ffffff;
+}
+
+.deepseek-full-mark {
+  display: block;
+  width: min(247px, 70vw);
+  max-width: min(364px, 94vw);
+  height: auto;
+}
+
+.opencode-wordmark {
+  display: block;
+  color: #000000;
+  width: min(299px, 75vw);
+  max-width: min(390px, 96vw);
+  height: auto;
+}
+
+[data-theme="dark"] .opencode-wordmark {
+  color: #ffffff;
+}
+
+/* 火山方舟: icon + Chinese label — horizontal row, centered above composer */
+.volcano-ark-welcome-mark {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: min(468px, 94vw);
+  margin-inline: auto;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.volcano-ark-welcome-mark .provider-brand-icon {
+  flex: 0 0 auto;
+  display: block;
+  width: 47px;
+  height: 47px;
+}
+
+.volcano-ark-welcome-mark__text {
+  flex: 0 0 auto;
+  font-size: clamp(2.1125rem, 6.76vw, 2.7625rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: inherit;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* 智谱: same icon+label row as 火山方舟 */
+.zhipu-welcome-mark {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: min(468px, 94vw);
+  margin-inline: auto;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.zhipu-welcome-mark .provider-brand-icon {
+  flex: 0 0 auto;
+  display: block;
+  width: 47px;
+  height: 47px;
+}
+
+.zhipu-welcome-mark__text {
+  flex: 0 0 auto;
+  font-size: clamp(2.1125rem, 6.76vw, 2.7625rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: inherit;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Context bar + composer share transcript reading width */
+.composer-stack {
+  pointer-events: none;
+  width: 100%;
+  max-width: var(--chat-width-max, 800px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  /* No container-type here. This stack wraps the composer field.
+   * A size container around the field makes WebView2 report a 0×0 caret,
+   * so Microsoft Pinyin anchors at the primary screen origin and Shift
+   * no longer toggles language (#1284). The query lives on the chip rows. */
+}
+
+.composer-stack--with-context {
+  gap: 6px;
+}

@@ -1,0 +1,844 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+
+.settings-cli-sessions__filter input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.settings-cli-sessions__filter input[type="search"]::-webkit-search-decoration,
+.settings-cli-sessions__filter input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.settings-cli-sessions__search-note {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+.settings-cli-sessions__prompt {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+.settings-cli-sessions__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.settings-cli-sessions__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated, var(--bg-input));
+  min-width: 0;
+}
+
+.settings-cli-sessions__item--linked {
+  border-color: color-mix(in srgb, var(--accent, #6b8afd) 36%, var(--border-subtle));
+  background: color-mix(
+    in srgb,
+    var(--accent, #6b8afd) 6%,
+    var(--bg-elevated, var(--bg-input))
+  );
+}
+
+.settings-cli-sessions__meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-cli-sessions__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-cli-sessions__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.settings-cli-sessions__sub {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-cli-sessions__id-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.settings-cli-sessions__id {
+  font-size: 11px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.settings-cli-sessions__copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.settings-cli-sessions__copy:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-secondary);
+}
+
+.settings-cli-sessions__row-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-cli-sessions__badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #6b8afd) 18%, transparent);
+  color: var(--text-secondary);
+  font-weight: 560;
+}
+
+.settings-cli-sessions__empty {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  padding: 6px 2px;
+}
+
+.settings-cli-sessions__err {
+  font-size: 12.5px;
+  color: var(--danger, #d33);
+  padding: 4px 2px;
+}
+
+.settings-cli-sessions__ok {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  padding: 4px 2px;
+}
+
+/* Settings → About: GitHub release check */
+.settings-about-update {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.settings-about-update__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-about-update__status {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.settings-about-update__status.is-available {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.settings-about-update__status.is-error {
+  color: var(--danger, #d33);
+  font-weight: 500;
+}
+
+.settings-about-update__err {
+  font-size: 12.5px;
+  color: var(--danger, #d33);
+  line-height: 1.45;
+}
+
+.settings-about-update__assets {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+/* ===== Drag-drop zone overlays (OS file drop) =====
+   Full-bleed wash + inset ring (no dashed frame with margins).
+   Hint card floats center; icons from Tabler only. */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  border-radius: inherit;
+  animation: drop-overlay-in 180ms ease-out;
+}
+
+@keyframes drop-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.drop-overlay__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 300px;
+  padding: 20px 24px;
+  border-radius: var(--modal-radius, 16px);
+  text-align: center;
+  /* Material from unified .drop-overlay__card glass surface */
+  animation: drop-card-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes drop-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.drop-overlay__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.drop-overlay__card strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.drop-overlay__card span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* Main / chat: soft blue wash, full bleed, inset ring via box-shadow */
+.drop-overlay--attach {
+  background: linear-gradient(
+    180deg,
+    rgba(70, 130, 255, 0.09) 0%,
+    rgba(70, 130, 255, 0.14) 100%
+  );
+  box-shadow: inset 0 0 0 2px rgba(80, 140, 255, 0.42);
+}
+
+.drop-overlay--attach .drop-overlay__icon {
+  color: rgb(70, 130, 255);
+  background: rgba(70, 130, 255, 0.12);
+}
+
+/* Sidebar: soft green wash, full bleed */
+.drop-overlay--project {
+  background: linear-gradient(
+    180deg,
+    rgba(50, 170, 110, 0.1) 0%,
+    rgba(50, 170, 110, 0.16) 100%
+  );
+  box-shadow: inset 0 0 0 2px rgba(55, 175, 115, 0.42);
+}
+
+.drop-overlay--project .drop-overlay__icon {
+  color: rgb(40, 150, 95);
+  background: rgba(50, 170, 110, 0.14);
+}
+
+[data-theme="light"] .drop-overlay--attach {
+  background: linear-gradient(
+    180deg,
+    rgba(70, 130, 255, 0.06) 0%,
+    rgba(70, 130, 255, 0.11) 100%
+  );
+}
+[data-theme="light"] .drop-overlay--project {
+  background: linear-gradient(
+    180deg,
+    rgba(50, 170, 110, 0.07) 0%,
+    rgba(50, 170, 110, 0.12) 100%
+  );
+}
+
+/* Zone chrome while dragging — dim non-target gently, no layout jump.
+ * Do not set `transition` on bare `.sidebar` here: it would replace the
+ * width interpolation in sidebar.part1.css and hard-cut click-toggle. */
+.main {
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.main.is-drop-target,
+.sidebar.is-drop-target {
+  position: relative;
+}
+
+.main.is-drop-idle,
+.sidebar.is-drop-idle {
+  opacity: 0.55;
+  filter: saturate(0.85);
+}
+
+.app-toast {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%) translateZ(0);
+  /* Above GlassModal .overlay (12000) so rewind/fork errors are visible. */
+  z-index: 14000;
+  max-width: min(420px, 90%);
+  padding: 8px 14px;
+  border-radius: var(--menu-radius, 12px);
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  isolation: isolate;
+  font-size: 12px;
+  color: var(--text-primary);
+  pointer-events: none;
+  animation: drop-overlay-in 160ms ease-out;
+}
+
+/* ===== Main — solid content surface (not glass) ===== */
+.main {
+  flex: 1;
+  /* Floor so open aside / narrow windows cannot crush the conversation.
+   * Keep in sync with MAIN_CHAT_MIN_WIDTH in layout.ts (360). */
+  min-width: 360px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+  position: relative;
+  border-radius: 0;
+  z-index: 2;
+}
+
+/* Center title bar — same height as sidebar-chrome + rv__head so dividers align */
+.main__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--titlebar-height, 40px);
+  min-height: var(--titlebar-height, 40px);
+  max-height: var(--titlebar-height, 40px);
+  padding: 0 12px 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  gap: var(--space-2);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.platform-win .main__top,
+.platform-linux .main__top,
+.platform-other .main__top,
+.has-custom-chrome .main__top,
+.platform-win .settings-page__chrome,
+.platform-linux .settings-page__chrome,
+.platform-other .settings-page__chrome,
+.has-custom-chrome .settings-page__chrome,
+.platform-win .settings-page__titlebar,
+.platform-linux .settings-page__titlebar,
+.platform-other .settings-page__titlebar,
+.has-custom-chrome .settings-page__titlebar,
+.platform-win .auto-page__head,
+.platform-linux .auto-page__head,
+.has-custom-chrome .auto-page__head,
+/* Resource pane chrome (tabs + actions) — both legacy .rp__chrome empty state
+   and live .rp-chrome toolbar. Must clear fixed .window-controls (3 × 46px). */
+.platform-win .rp__chrome,
+.platform-linux .rp__chrome,
+.platform-other .rp__chrome,
+.has-custom-chrome .rp__chrome,
+.platform-win .rp-chrome,
+.platform-linux .rp-chrome,
+.platform-other .rp-chrome,
+.has-custom-chrome .rp-chrome {
+  padding-right: var(--window-controls-inset, 138px); /* 46px × 3 window controls */
+}
+
+/* Settings content already clears chrome via .settings-page__content padding-top */
+
+/* Ensure buttons/inputs inside settings stay interactive under drag CSS */
+.settings-page__nav-inner button,
+.settings-page__nav-inner input,
+.settings-page__main button,
+.settings-page__main input,
+.settings-page__main select,
+.settings-page__main textarea {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.main__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+}
+
+.main__title-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.main__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.main__title-menu {
+  opacity: 0.7;
+}
+
+.main__title-row:hover .main__title-menu,
+.main__title-menu:focus-visible {
+  opacity: 1;
+}
+
+.main__sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  margin: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Codex-like reconnect chip — muted, not a red/orange alarm */
+.main__sub--retry {
+  max-width: min(420px, 42vw);
+  color: var(--text-secondary);
+  opacity: 0.92;
+}
+
+/* Open-location split — same flat chip language as .chip / .chrome-btn */
+.open-loc {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+  overflow: visible;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.open-loc:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.open-loc.is-open {
+  color: var(--text-primary);
+  background: var(--bg-active, var(--bg-hover));
+}
+
+.open-loc.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.open-loc__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px; /* match chrome / chip internal gaps */
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.open-loc__main:focus-visible,
+.open-loc__caret:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+
+.open-loc__app-ico {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.open-loc__app-ico img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  display: block;
+  border-radius: 4px;
+}
+
+.open-loc__label {
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.open-loc__caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 100%;
+  padding: 0 6px 0 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.62;
+  cursor: pointer;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.open-loc:hover .open-loc__caret,
+.open-loc.is-open .open-loc__caret,
+.open-loc__caret:hover {
+  opacity: 1;
+}
+
+.open-loc--compact {
+  width: auto;
+}
+
+.open-loc--compact .open-loc__main {
+  padding: 0 6px;
+  gap: 0;
+}
+
+.open-loc--compact .open-loc__caret {
+  width: 20px;
+  padding: 0 4px 0 0;
+}
+
+.open-loc-menu {
+  z-index: 10050;
+  display: flex;
+  flex-direction: column;
+  gap: var(--menu-gap);
+}
+
+.main__top-actions {
+  display: flex;
+  /* Match resource chrome actions (tree + close) and chrome-btn rhythm */
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.main__top-actions .open-loc,
+.main__top-actions .chrome-btn {
+  margin: 0;
+}
+
+/* Chat stage: full-height scroll + floating composer over it */
+.main__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Lobe chat fills the stage (replaces .chat-surface) */
+.main__stage > .lobe-chat,
+.main__stage > .chat-surface {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Composer clearance is .lobe-chat__end-pad (scrollHeight). Keep inner pad small. */
+.main__stage .lobe-chat__inner {
+  padding-bottom: 8px;
+}
+
+/* Clear the overlay plan card — pad matches measured card height, not a full-width strip. */
+.main:has(.plan-bar) .main__stage .lobe-chat__inner {
+  padding-top: calc(var(--plan-bar-float-pad, 80px) + 8px);
+}
+
+/* Welcome: composer is centered, not bottom-docked — no extra chat pad */
+.main__stage:has(.composer-wrap--welcome) .lobe-chat__inner {
+  padding-bottom: 16px;
+}
+.main__stage:has(.composer-wrap--welcome) .lobe-chat__end-pad {
+  height: 0;
+}
+
+/* Legacy list hooks (non-chat surfaces) */
+.messages {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages.overlay-scroll .overlay-scroll__viewport,
+.messages__viewport {
+  padding: var(--space-5) var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overscroll-behavior: contain;
+}
+
+.messages__col {
+  width: 100%;
+  max-width: var(--chat-width-max, 800px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: min-content;
+  padding-bottom: calc(var(--composer-float-pad, 168px) + 12px);
+  box-sizing: border-box;
+}
+
+.fold {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  overflow: hidden;
+  width: 100%;
+}
+
+.fold__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fold__summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold__body {
+  padding: 0 12px 12px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.message {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* User: right-aligned, size-to-content (up to column width) */
+.message--user {
+  align-self: flex-end;
+  width: fit-content;
+  max-width: min(100%, 520px);
+}
+
+/* Agent: left full-width of column */
+.message--assistant {
+  align-self: stretch;
+  width: 100%;
+}
+
+/* User bubble — theme tokens (no hardcoded light white) */
+.message__bubble--user {
+  display: inline-block;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--bg-user-bubble);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message__assistant {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message__toolbar {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.message__assistant:hover .message__toolbar,
+.message__assistant:focus-within .message__toolbar {
+  opacity: 1;
+}
+
+.message__tool {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.message__tool--icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.message__tool:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Phosphor SVGs inherit currentColor via wrapper */
+.g-icon svg {
+  display: block;
+}
+
+/* Markdown */
+.md-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+/* Streaming caret intentionally disabled — smooth buffer handles reveal. */
+.md-body--streaming::after {
+  content: none;
+}
+
+.md-body p {
+  margin: 0 0 0.75em;
+}
+
+.md-body p:last-child {
+  margin-bottom: 0;
+}
+
+.md-body .katex {
+  font-size: 1.05em;
+}
+
+.md-body .katex-display {
+  margin: 0.65em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}

@@ -1,0 +1,6 @@
+source=https://github.com/ChatCut-Inc/agent-plugin.git
+subdir=codex
+commit=e1867a8b48fae0153ef3542efb0ca8fa4e80ad3a
+fetched_at=2026-08-01T16:15:46Z
+note=Sparse-clone codex/ only; re-pull via scripts/chatcut-plugin-start.mjs --fetch
+

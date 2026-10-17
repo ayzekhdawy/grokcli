@@ -1,0 +1,849 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+
+/*
+ * ===== Unified frosted glass surface =====
+ * Modals, search, effort/model pops, drawers, drop cards, glass popovers.
+ * Context / right-click menus are solid (see block below) — not glass.
+ */
+.glass-surface,
+.c-select__menu,
+.user-menu__pop,
+.slash-palette,
+.prompt-history,
+.modal,
+.search-panel,
+.session-mru-panel,
+.cmm__pop,
+.auto-panel,
+.drop-overlay__card {
+  background: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  transform: translateZ(0);
+  isolation: isolate;
+}
+
+/* Floating menu chrome (dropdown reference: radius / pad / type) */
+.menu-panel,
+.ctx-menu,
+.open-loc-menu,
+.composer-plus,
+.c-select__menu,
+.user-menu__pop,
+.att-menu,
+.rp-open-menu,
+.auto-page__create-menu,
+.auto-row__menu,
+.project-menu {
+  border-radius: var(--menu-radius);
+  padding: var(--menu-pad);
+  font-size: var(--menu-font);
+  font-weight: var(--menu-font-weight);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  /* Content + padding; no fixed panel width */
+  width: max-content;
+  max-width: var(--menu-max-width);
+  min-width: 0;
+}
+
+/*
+ * Context / right-click menus — solid opaque (no glass / blur).
+ * Unified component: .context-menu (chat att-menu baseline).
+ * Legacy .ctx-menu / .att-menu aliases kept for any residual markup.
+ */
+.context-menu,
+.ctx-menu,
+.att-menu,
+.open-loc-menu,
+.rp-open-menu,
+.auto-page__create-menu,
+.auto-row__menu,
+.project-menu,
+.composer-plus,
+.menu-panel.context-menu,
+.menu-panel.ctx-menu,
+.menu-panel.att-menu,
+.menu-panel.open-loc-menu,
+.menu-panel.rp-open-menu,
+.menu-panel.auto-page__create-menu,
+.menu-panel.auto-row__menu,
+.menu-panel.composer-plus {
+  background: var(--menu-context-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--menu-context-border);
+  box-shadow: var(--menu-context-shadow);
+  border-radius: var(--menu-context-radius, 10px);
+  padding: var(--menu-context-pad, 4px);
+  transform: none;
+  isolation: auto;
+  gap: var(--menu-context-gap, 1px);
+}
+
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .glass-surface,
+  .c-select__menu,
+  .user-menu__pop,
+  .slash-palette,
+  .prompt-history,
+  .modal,
+  .search-panel,
+  .cmm__pop,
+  .auto-panel,
+  .drop-overlay__card {
+    background: var(--glass-surface-solid);
+  }
+}
+
+/* Shared menu rows (buttons / options) */
+.ctx-menu button,
+.open-loc-menu__item,
+.c-select__option,
+.user-menu__item,
+.att-menu__item,
+.rp-open-menu__item,
+.auto-row__menu button,
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--menu-item-gap);
+  width: 100%;
+  text-align: left;
+  padding: var(--menu-item-pad-y) var(--menu-item-pad-x);
+  border-radius: var(--menu-item-radius);
+  font-size: var(--menu-font);
+  font-weight: var(--menu-font-weight);
+  line-height: 1.3;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  white-space: nowrap;
+  transform: translateZ(0);
+}
+
+.menu-shortcut {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-tertiary);
+  opacity: 0.55;
+}
+
+/* Context menu rows — tighter L/R pad (unified + legacy) */
+.context-menu__item,
+.ctx-menu button,
+.att-menu__item,
+.open-loc-menu__item,
+.rp-open-menu__item,
+.auto-row__menu button,
+.auto-page__create-menu button {
+  padding: var(--menu-context-item-pad-y, 6px) var(--menu-context-item-pad-x, 8px);
+  gap: var(--menu-context-item-gap, 6px);
+  border-radius: var(--menu-context-item-radius, 6px);
+}
+
+.context-menu__item.is-danger,
+.context-menu__item.is-danger .context-menu__ico {
+  color: var(--danger);
+}
+
+.context-menu__item.is-danger:hover {
+  background: var(--danger-muted);
+  color: var(--danger);
+}
+
+.context-menu__item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.context-menu__item--submenu {
+  position: relative;
+}
+
+.context-menu__item--submenu.is-open {
+  background: var(--menu-hover);
+}
+
+.context-menu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.context-menu__sub-chev {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  margin-left: auto;
+}
+
+.context-menu__ico {
+  width: var(--menu-icon);
+  height: var(--menu-icon);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 13000;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--menu-context-gap, 1px);
+  pointer-events: auto;
+  /* Tall menus (project policy, export flyouts) cap height and scroll. */
+  max-height: min(70vh, calc(100vh - 16px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Flyout is portaled separately; keep it solid and slightly above root. */
+.context-menu--flyout {
+  z-index: 13001;
+  max-height: min(70vh, calc(100vh - 16px));
+}
+
+/* Leading icon slot in context / item menus (app-picker open-loc keeps its own ico) */
+.ctx-menu__ico,
+.att-menu__ico {
+  width: var(--menu-icon);
+  height: var(--menu-icon);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+
+.ctx-menu button.is-danger .ctx-menu__ico {
+  color: var(--danger);
+}
+
+.ctx-menu button:hover,
+.open-loc-menu__item:hover,
+.c-select__option:hover:not(.is-disabled),
+.user-menu__item:hover,
+.att-menu__item:hover,
+.rp-open-menu__item:hover,
+.auto-row__menu button:hover,
+.context-menu__item:hover {
+  background: var(--menu-hover);
+  color: var(--text-primary);
+}
+
+.open-loc-menu__item.is-active,
+.c-select__option.is-selected,
+.auto-row__menu button.is-active {
+  background: var(--menu-active);
+  font-weight: 500;
+}
+
+.ctx-menu button.is-danger,
+.auto-row__menu button.is-danger {
+  color: var(--danger);
+}
+
+.ctx-menu button.is-danger:hover,
+.auto-row__menu button.is-danger:hover {
+  background: var(--danger-muted);
+  color: var(--danger);
+}
+
+/* Shared icon slot + separator */
+.open-loc-menu__ico,
+.rp-open-menu__ico {
+  width: var(--menu-icon);
+  height: var(--menu-icon);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+
+.open-loc-menu__ico img,
+.rp-open-menu__ico img {
+  width: var(--menu-icon);
+  height: var(--menu-icon);
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+}
+
+.open-loc-menu__sep,
+.rp-open-menu__sep,
+.context-menu__sep,
+.user-menu__flyout-sep {
+  height: 1px;
+  margin: var(--menu-sep-margin-y) var(--menu-sep-margin-x);
+  background: var(--menu-border);
+  flex-shrink: 0;
+}
+
+/* Floating context menu — above composer/portal popovers */
+.ctx-menu {
+  position: fixed;
+  z-index: 13000;
+  margin: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--menu-context-gap, 1px);
+  pointer-events: auto;
+}
+
+.platform-win .sidebar {
+  padding-top: 0;
+}
+
+/* Tabler Icons wrappers (src/components/icons.tsx) — sole icon system */
+.g-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+  color: currentColor;
+}
+
+.g-icon svg {
+  display: block;
+  overflow: visible;
+  transform-origin: center center;
+}
+
+/* Brand mark: theme via currentColor (dark → light glyph, light → dark glyph) */
+.g-icon--grok-mark,
+.grok-logo {
+  color: var(--text-primary);
+}
+
+.g-icon--grok-mark svg,
+.grok-logo svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.sidebar-brand-row__left .grok-logo,
+.sidebar-brand-row__left .g-icon--grok-mark,
+.nav-new__brand .grok-logo,
+.nav-new__brand .g-icon--grok-mark {
+  color: inherit;
+}
+
+.fold__chev {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ===== Sidebar icon hover (optional micro-motion) ===== */
+.nav-item:not(:hover) .g-icon--anim svg,
+.nav-new:not(:hover):not(:focus-visible) .g-icon--anim svg,
+.brand__collapse:not(:hover) .g-icon--anim svg,
+.section-head:not(:hover) .g-icon--anim svg,
+.section-head__action:not(:hover) .g-icon--anim svg,
+.project-row__action:not(:hover) .g-icon--anim svg {
+  animation: none !important;
+}
+
+.nav-item:hover .g-icon--search svg,
+.nav-new:hover .g-icon--search svg {
+  animation: g-icon-search 0.55s cubic-bezier(0.34, 1.2, 0.64, 1) 1;
+}
+
+.nav-item:hover .g-icon--new-chat svg,
+.nav-new:hover .g-icon--new-chat svg {
+  animation: g-icon-new-chat 0.5s cubic-bezier(0.34, 1.15, 0.64, 1) 1;
+}
+
+.nav-item:hover .g-icon--imagine svg {
+  animation: g-icon-imagine 0.5s cubic-bezier(0.34, 1.15, 0.64, 1) 1;
+}
+
+.nav-item:hover .g-icon--automations svg {
+  animation: g-icon-automations 0.65s cubic-bezier(0.34, 1.1, 0.64, 1) 1;
+}
+
+.nav-item:hover .g-icon--skills svg {
+  animation: g-icon-skills 0.55s cubic-bezier(0.34, 1.15, 0.64, 1) 1;
+}
+
+.brand__collapse:hover .g-icon--collapse svg {
+  animation: g-icon-collapse 0.4s cubic-bezier(0.34, 1.2, 0.64, 1) 1;
+}
+
+.nav-item:hover .g-icon--anim:not(.g-icon--search):not(.g-icon--new-chat):not(.g-icon--imagine):not(.g-icon--automations):not(.g-icon--skills) svg,
+.section-head:hover .g-icon--anim svg,
+.section-head__action:hover .g-icon--anim svg,
+.project-row__action:hover .g-icon--anim svg {
+  animation: g-icon-nudge 0.4s cubic-bezier(0.34, 1.2, 0.64, 1) 1;
+}
+
+@keyframes grok-mark-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Search: glass dips then snaps (matches SearchLottie feel) */
+@keyframes g-icon-search {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  35% {
+    transform: scale(0.88) rotate(-12deg);
+  }
+  70% {
+    transform: scale(1.08) rotate(8deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* New chat: pencil pop (SquarePenLottie) */
+@keyframes g-icon-new-chat {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  30% {
+    transform: scale(0.9) translate(1px, -1px);
+  }
+  55% {
+    transform: scale(1.1) translate(-1px, 1px);
+  }
+  100% {
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+/* Imagine: frame pulse */
+@keyframes g-icon-imagine {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.9);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Automations: clock wind */
+@keyframes g-icon-automations {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  40% {
+    transform: rotate(-25deg) scale(0.95);
+  }
+  75% {
+    transform: rotate(12deg) scale(1.05);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+/* Skills: tiles settle */
+@keyframes g-icon-skills {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  35% {
+    transform: scale(0.88) rotate(-6deg);
+  }
+  65% {
+    transform: scale(1.1) rotate(4deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes g-icon-collapse {
+  0% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(-3px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes g-icon-nudge {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g-icon--grok-mark svg,
+  .nav-item:hover .g-icon--anim svg,
+  .nav-new:hover .g-icon--anim svg,
+  .brand__collapse:hover .g-icon--anim svg,
+  .section-head:hover .g-icon--anim svg,
+  .section-head__action:hover .g-icon--anim svg,
+  .project-row__action:hover .g-icon--anim svg {
+    animation: none !important;
+  }
+}
+
+.g-icon--close {
+  transform: rotate(45deg);
+}
+
+.g-icon--danger {
+  color: var(--danger);
+}
+
+.brand__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.brand__collapse {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+}
+
+.brand__collapse:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item__icon .g-icon,
+.nav-new .g-icon,
+.project-row__actions .g-icon,
+.session-row .g-icon {
+  color: currentColor;
+}
+
+.project-row {
+  position: relative;
+}
+
+.project-row__actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Hover / keyboard focus only — do not keep actions visible on the
+   last-clicked / active project row (matches session-row affordance). */
+.project-row:hover .project-row__actions,
+.project-row:focus-within .project-row__actions {
+  display: inline-flex;
+}
+
+.project-row__action {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.project-row__action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.project-menu {
+  position: absolute;
+  right: 4px;
+  top: calc(100% - 2px);
+  z-index: 40;
+  /* Content-sized; do not force a wide empty panel */
+  width: max-content;
+  min-width: 0;
+  max-width: var(--menu-max-width, 360px);
+  margin: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--menu-gap);
+}
+
+.project-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--menu-item-gap);
+  width: 100%;
+  padding: var(--menu-item-pad-y) var(--menu-item-pad-x);
+  border-radius: var(--menu-item-radius);
+  font-size: var(--menu-font);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.project-menu button:hover {
+  background: var(--menu-hover);
+  color: var(--text-primary);
+}
+
+.project-menu button.is-danger {
+  color: var(--danger);
+}
+
+.section-head-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: var(--space-2);
+  padding-right: 4px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+}
+
+.section-head:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.section-head__label {
+  flex: 1;
+  text-align: left;
+}
+
+.section-head__action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.section-head__action:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 6px var(--space-2) var(--space-3);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.brand .grok-logo {
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.sidebar__section-label {
+  margin: var(--space-3) var(--space-2) var(--space-1);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ssh-remote-rail {
+  padding: 4px 0 8px;
+}
+
+.project-block {
+  margin-bottom: 2px;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.project-row:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.project-row--active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.project-row__chev {
+  width: 14px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.project-row__icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.project-row__name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.project-row__badge {
+  font-size: 10px;
+  color: var(--warning);
+}
+
+.session-list {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 4px;
+}
+
+.session-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  transform: translateZ(0);
+}
+
+.session-row:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.session-row--active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.session-row__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-row__meta {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/*
+ * Sidebar session list density (Settings → Appearance → Interface).
+ * Prefer html[data-sidebar-density] so VirtualList CSS + metrics stay aligned.
+ * Comfortable = defaults above (.tree-l3 30px / gap 2; .session-row padding 6×8).
+ * Keep row heights in sync with sidebarSessionRowMetrics() / SIDEBAR_DENSITY_METRICS.
+ */
+html[data-sidebar-density="compact"] .tree-l3 {
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
+  gap: 4px;
+  padding: 0 4px 0 10px;
+  font-size: 12px;
+}
+
+html[data-sidebar-density="compact"] .tree-l3.tree-l3--nested {
+  padding-left: 24px;
+}
+
+html[data-sidebar-density="compact"] .tree-l3__title {
+  line-height: 24px;
+  gap: 4px;
+}
+
+html[data-sidebar-density="compact"] .tree-l3__rename {
+  height: 18px;
+  padding: 0 4px;
+  line-height: 16px;
+}
+
+html[data-sidebar-density="compact"] .tree-l3--hint {
+  height: 22px;
+  min-height: 22px;
+  font-size: 11px;
+}
+
+html[data-sidebar-density="compact"] .tree-l3--more {
+  height: 22px;
+  min-height: 22px;
+  font-size: 11px;
+}

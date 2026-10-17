@@ -1,0 +1,5954 @@
+//! Independent store under ~/.grok-app: projects, sessions index, settings, secrets.
+
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::paths::{
+    automations_file, ensure_app_dirs, projects_file, session_dir, sessions_index_file,
+    settings_file,
+};
+
+/// Where composer model / effort / mode / permission choices are remembered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ComposerPrefsScope {
+    Global,
+    Project,
+    Session,
+}
+
+impl ComposerPrefsScope {
+    pub fn parse(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "project" => Self::Project,
+            "session" => Self::Session,
+            _ => Self::Global,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Global => "global",
+            Self::Project => "project",
+            Self::Session => "session",
+        }
+    }
+}
+
+/// Effective composer prefs resolved for the current context.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComposerPrefs {
+    pub model_id: String,
+    pub effort: String,
+    pub mode: String,
+    pub permission_policy: String,
+    /// Scope that was used when resolving (after reading settings).
+    pub scope: String,
+    /// Which layer actually supplied the values (global | project | session).
+    pub source: String,
+    /// `official` or a custom provider section id. Missing → global route.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+}
+
+impl Default for ComposerPrefs {
+    fn default() -> Self {
+        Self {
+            model_id: DEFAULT_OFFICIAL_MODEL_ID.into(),
+            // Official product default effort stays Extra High on 4.7 / 4.6.
+            effort: "xhigh".into(),
+            mode: "agent".into(),
+            permission_policy: "ask".into(),
+            scope: "global".into(),
+            source: "global".into(),
+            provider_id: None,
+        }
+    }
+}
+
+/// Legacy id for the short-lived "General" sidebar project (`system:general`).
+/// No longer registered in `projects.json`; kept so we can migrate old rows /
+/// session bindings. Orphan chats use `project_id = None` and cwd
+/// `{app_data}/workspaces/general`.
+pub const GENERAL_PROJECT_ID: &str = "system:general";
+
+/// Named sidebar Space (UI grouping of projects). Not a git workspace.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSpaceRecord {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub trusted: bool,
+    pub last_opened_at: DateTime<Utc>,
+    pub path_ok: bool,
+    /// Pinned projects float to the top of the sidebar.
+    #[serde(default)]
+    pub pinned: bool,
+    /// Legacy flag from the temporary system:general project. Not used for new data.
+    #[serde(default)]
+    pub system: bool,
+    /// Per-project composer prefs (used when scope = project).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_policy: Option<String>,
+    /// Per-project OS sandbox profile override (`off` / `workspace` / …).
+    /// `None` → use app Settings `sandboxProfile`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox_profile: Option<String>,
+    /// Optional sidebar accent color: named token (`blue` / `green` / …) or `#rgb` / `#rrggbb`.
+    /// `None` → no color accent (migration-safe default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// When set, `path` is on this OpenSSH Host, not the local disk.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_alias: Option<String>,
+}
+
+impl Project {
+    /// True for the retired system:general row (migration only).
+    pub fn is_legacy_general(&self) -> bool {
+        self.id == GENERAL_PROJECT_ID || self.system
+    }
+
+    /// `path` lives on this OpenSSH Host — never a local `is_dir` check.
+    pub fn is_ssh_remote(&self) -> bool {
+        ssh_alias_of(self).is_some()
+    }
+}
+
+fn ssh_alias_of(p: &Project) -> Option<&str> {
+    p.ssh_alias
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && crate::ssh_remote::is_safe_ssh_alias(s))
+}
+
+/// `add_ssh_project` names rows `{alias}:{path_basename}` with a POSIX cwd.
+/// Used to repair rows that lost `ssh_alias` and were then marked path-missing.
+pub(crate) fn infer_ssh_alias_from_name(name: &str, path: &str) -> Option<String> {
+    let path = path.trim();
+    if path.is_empty() || !path.starts_with('/') {
+        return None;
+    }
+    let (alias, rest) = name.split_once(':')?;
+    let alias = alias.trim();
+    if !crate::ssh_remote::is_safe_ssh_alias(alias) {
+        return None;
+    }
+    let base = Path::new(path).file_name()?.to_string_lossy();
+    if rest.trim() != base.as_ref() {
+        return None;
+    }
+    Some(alias.to_string())
+}
+
+fn apply_ssh_path_health(list: &mut [Project]) -> bool {
+    let mut dirty = false;
+    for p in list {
+        if ssh_alias_of(p).is_some() {
+            if !p.path_ok {
+                p.path_ok = true;
+                dirty = true;
+            }
+            continue;
+        }
+        if PathBuf::from(&p.path).is_dir() {
+            p.path_ok = true;
+            continue;
+        }
+        if let Some(alias) = infer_ssh_alias_from_name(&p.name, &p.path) {
+            p.ssh_alias = Some(alias);
+            p.path_ok = true;
+            dirty = true;
+            continue;
+        }
+        p.path_ok = false;
+    }
+    dirty
+}
+
+fn rehome_sessions_project_id(from_id: &str, to_id: &str) {
+    if from_id == to_id {
+        return;
+    }
+    let _ = update_sessions_index(|sessions| {
+        for s in sessions {
+            if s.project_id.as_deref() == Some(from_id) {
+                s.project_id = Some(to_id.to_string());
+            }
+        }
+        Ok(())
+    });
+}
+
+/// Same OpenSSH alias + remote cwd must be one sidebar folder.
+fn dedup_ssh_projects_by_alias_path(list: &mut Vec<Project>) -> bool {
+    use std::collections::{HashMap, HashSet};
+    let mut groups: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    for (i, p) in list.iter().enumerate() {
+        let Some(alias) = ssh_alias_of(p) else {
+            continue;
+        };
+        groups
+            .entry((alias.to_string(), p.path.clone()))
+            .or_default()
+            .push(i);
+    }
+    let mut drop_ids = HashSet::new();
+    for idxs in groups.values() {
+        if idxs.len() < 2 {
+            continue;
+        }
+        let winner = idxs
+            .iter()
+            .copied()
+            .max_by_key(|&i| list[i].last_opened_at)
+            .expect("non-empty group");
+        let winner_id = list[winner].id.clone();
+        for &i in idxs {
+            if i == winner {
+                continue;
+            }
+            rehome_sessions_project_id(&list[i].id, &winner_id);
+            drop_ids.insert(list[i].id.clone());
+        }
+    }
+    if drop_ids.is_empty() {
+        return false;
+    }
+    list.retain(|p| !drop_ids.contains(&p.id));
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMeta {
+    pub id: String,
+    pub project_id: Option<String>,
+    pub title: String,
+    pub agent_session_id: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub model_id: Option<String>,
+    /// Archived chats stay on disk but hide from the default tree.
+    #[serde(default)]
+    pub archived: bool,
+    /// Pinned chats float to the top of the sidebar (within their group).
+    #[serde(default)]
+    pub pinned: bool,
+    /// Per-session composer prefs (used when scope = session).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_policy: Option<String>,
+    /// Optional JSON Schema for structured model output (`grok --json-schema`).
+    /// Empty / unset → no constraint. Validated on the client before save.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub json_schema: Option<String>,
+    /// Created by shell scheduled automation (`runAutomation`).
+    #[serde(default)]
+    pub scheduled: bool,
+    /// Absolute path of a linked git worktree this chat was opened against.
+    /// Empty/missing on normal project sessions (migration-safe).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_path: Option<String>,
+    /// Branch name (no `refs/heads/`) when known for [`Self::worktree_path`].
+    pub worktree_branch: Option<String>,
+    /// Explicit worktree-bound chat flag. Default false for older index rows.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_worktree_session: bool,
+    /// Session-only plugin directories passed as CLI `--plugin-dir` on spawn
+    /// (repeatable). Does not change global Extensions / `~/.grok` plugins.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugin_dirs: Vec<String>,
+    /// Optional per-session extra rules appended via top-level `grok --rules`.
+    /// Empty / unset → no flag. Soft-respawn reloads on change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra_rules: Option<String>,
+    /// Optional per-session `--max-turns` override (1–200).
+    /// `None` / 0 → inherit global `AppSettings.max_agent_turns`. Soft-respawn on change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_agent_turns: Option<u32>,
+    /// Optional per-session system prompt override via top-level
+    /// `grok --system-prompt-override` (alias `--system-prompt`).
+    /// Empty / unset → no flag. Soft-respawn reloads on change.
+    /// Never log the full value (may contain secrets / PII).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system_prompt_override: Option<String>,
+    /// One-shot CLI `--fork-session` semantics: on next connect, fork the agent
+    /// session (ACP `session/fork`) so the chat gets a **new** agent session id
+    /// with the source’s context instead of reusing via `session/load`.
+    /// Requires `agent_session_id` as the source; cleared after connect attempt.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fork_agent_session: bool,
+    /// One-shot: after ACP session/fork, rewind the CHILD to this 0-based
+    /// user prompt index (`restoreFiles=false`). Partial forks only.
+    /// Cleared after the connect attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork_rewind_prompt_index: Option<u32>,
+    /// Optional per-session override for CLI top-level `--no-ask-user`
+    /// (disables `ask_user_question` for the agent process; CLI ≥ 0.2.117).
+    /// `None` → inherit global `AppSettings.no_ask_user`. Soft-respawn on change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_ask_user: Option<bool>,
+    /// Optional multi-root workspace id (`workspaces.json`, #1194).
+    /// Missing on legacy sessions → single-project behavior.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// Snapshot of workspace roots at bind time (detect drift on restore).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_root_snapshot: Option<String>,
+    /// Last known capability label (`context_only`, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_capability: Option<String>,
+    /// Provider this chat was last used with. `official`, or a custom section id.
+    /// Missing on older rows → follow the global route until the user picks one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    pub theme: String,
+    #[serde(default = "default_locale")]
+    pub locale: String,
+    /// One-shot: factory locale `en` → `system` so first-run follows OS language.
+    /// Missing field deserializes as false so existing installs migrate once.
+    #[serde(default)]
+    pub locale_follow_system_migrated: bool,
+    #[serde(default = "default_session_data_mode")]
+    pub session_data_mode: String,
+    pub manual_cli_path: Option<String>,
+    /// CLI launch backend: `native` (default) or `wsl` (Windows only — spawn via `wsl.exe`).
+    #[serde(default = "default_cli_backend")]
+    pub cli_backend: String,
+    /// Optional WSL distro name when `cli_backend == "wsl"`. Empty = default distro.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wsl_distro: Option<String>,
+    /// Path to `grok` **inside** WSL (e.g. `grok`, `~/.grok/bin/grok`). Empty = `grok` on WSL PATH.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wsl_cli_path: Option<String>,
+    /// Linux-native GROK_HOME when `cli_backend == "wsl"`. Empty = distro `~/.grok`.
+    /// Must not be a `/mnt/…` Windows mount (sandbox binds fail on DrvFS).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wsl_grok_home: Option<String>,
+    pub permission_policy: String,
+    pub model_id: Option<String>,
+    pub effort: Option<String>,
+    pub mode: String,
+    pub onboarding_done: bool,
+    pub setup_skipped: bool,
+    /// First-run setup wizard finished (CLI gate + optional auth step).
+    #[serde(default)]
+    pub setup_wizard_completed: bool,
+    /// User skipped account/provider configuration during setup.
+    #[serde(default)]
+    pub auth_setup_deferred: bool,
+    /// Default “open path” target: `finder` / `explorer` / editor id (`code`, `cursor`, …).
+    #[serde(default = "default_open_target")]
+    pub default_open_target: String,
+    /// Remember model / effort / mode / permission at global | project | session.
+    #[serde(default = "default_composer_prefs_scope")]
+    pub composer_prefs_scope: String,
+    /// Composer editor id: `legacy` (built-in) or `tiptap` (Markdown). Unknown
+    /// values load as `legacy`.
+    #[serde(default = "default_composer_editor")]
+    pub composer_editor: String,
+    /// **API mode.** When set (`host:port`), sessions connect to a remote ACP
+    /// server over TCP instead of spawning the local `grok agent stdio` — the
+    /// agent can run in WSL, a container, or on another host. Empty/unset uses
+    /// the normal local-CLI spawn path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp_server_addr: Option<String>,
+    /// Max warm/live agent processes (I02). Default 3.
+    #[serde(default = "default_max_concurrent_agents")]
+    pub max_concurrent_agents: u32,
+    /// Recycle idle agent processes after this many minutes (I03). Default 30.
+    #[serde(default = "default_agent_idle_minutes")]
+    pub agent_idle_minutes: u32,
+    /// True once the legacy pool-size migration has run for this install.
+    /// Keeps a deliberate small pool from being lifted again on every launch.
+    #[serde(default)]
+    pub pool_size_migrated: bool,
+    /// Pure stream silence before Keep waiting / End turn (I06). Default 600s (10 min).
+    #[serde(default = "default_stream_stall_seconds")]
+    pub stream_stall_seconds: u32,
+    /// True once the stream-stall default migration (120/180 → 600) has run.
+    #[serde(default)]
+    pub stream_stall_default_migrated: bool,
+    /// Store App API keys in the OS keychain (macOS Keychain / Win Cred / Secret Service).
+    /// Default **false**: keys stay in `secrets.json` (0600) so cold start does not
+    /// trigger system password prompts. Official CLI login still uses `auth.json`.
+    #[serde(default)]
+    pub store_api_keys_in_keychain: bool,
+    /// OS-level sandbox profile for spawned `grok agent` processes
+    /// (`off` | `workspace` | `read-only` | `strict` | `devbox`). Default off.
+    /// Passed as top-level `grok --sandbox <profile>` / `GROK_SANDBOX` at spawn.
+    #[serde(default = "default_sandbox_profile")]
+    pub sandbox_profile: String,
+    /// Show multi-root workspace UI (#1194). Default **true** (MVP-0 declare roots).
+    #[serde(default = "default_true")]
+    pub multi_root_workspace_enabled: bool,
+    /// Last workspace id used when starting a new chat (optional hint).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recent_workspace_id: Option<String>,
+    /// Enable Grok Build cross-session memory (`--experimental-memory` / `GROK_MEMORY=1`
+    /// / `[memory] enabled`). Default **false** — experimental; when off, spawn forces
+    /// `--no-memory` + `GROK_MEMORY=0` for isolation (esp. independent mode).
+    #[serde(default)]
+    pub experimental_memory: bool,
+    /// Grok Build compaction mode (CLI 0.2.117+): `summary` | `transcript` | `segments`.
+    /// Passed as top-level `--compaction-mode` / `GROK_COMPACTION_MODE` at spawn.
+    /// Default `summary` (CLI default). Soft-respawns on change.
+    #[serde(default = "default_compaction_mode")]
+    pub compaction_mode: String,
+    /// Segments verbatim detail (CLI 0.2.117+): `none` | `minimal` | `balanced` | `verbose`.
+    /// Only affects `--compaction-mode segments`. Passed as `--compaction-detail` /
+    /// `GROK_COMPACTION_DETAIL`. Default `verbose` (CLI default). Soft-respawns on change.
+    #[serde(default = "default_compaction_detail")]
+    pub compaction_detail: String,
+    /// Prefire two-pass compaction (CLI **0.2.117+** config
+    /// `two_pass_compaction_enabled` + env `GROK_TWO_PASS_COMPACTION`).
+    /// Default **false** (opt-in). Independent mode writes the top-level agent-home
+    /// key; spawn sets env (soft-fail when CLI is known older). Soft-respawns.
+    #[serde(default)]
+    pub two_pass_compaction_enabled: bool,
+    /// Cap agent turns per process via top-level `grok --max-turns N`.
+    /// `None` or `0` = omit the flag (CLI default / unlimited).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_agent_turns: Option<u32>,
+    /// Headless background-wait policy after the first agent turn
+    /// (`wait` | `no_wait` | `timeout`). CLI 0.2.117+; default `wait`
+    /// (omit flags). Affects headless `-p` / automations-like paths;
+    /// top-level flags are also passed on ACP spawn when the CLI is new
+    /// enough (soft-fail older builds).
+    #[serde(default = "default_background_wait_policy")]
+    pub background_wait_policy: String,
+    #[serde(default = "default_wallpaper_x_search_mode")]
+    pub wallpaper_x_search_mode: String,
+    /// Seconds for `--background-wait-timeout` when policy is `timeout`.
+    /// Clamped 1–3600; default 600 (CLI default when waiting).
+    #[serde(default = "default_background_wait_timeout_sec")]
+    pub background_wait_timeout_sec: u32,
+    /// When true, headless paths that use `--output-format streaming-messages-json`
+    /// also pass `--include-partial-messages` (CLI 0.2.117+) so incremental
+    /// `stream_event` deltas are emitted. Default false. Soft-fails on older
+    /// CLIs (flag omitted). Only valid with streaming-messages-json.
+    #[serde(default)]
+    pub include_partial_messages: bool,
+    /// When true, spawn agents with top-level `--disable-web-search` so
+    /// `web_search` / `web_fetch` tools are removed. Default false (CLI default).
+    #[serde(default)]
+    pub disable_web_search: bool,
+    /// Inject MCP **official-aux** (isolated official auth) into **custom**
+    /// main-route sessions only: `web_search`, all `x_*`, `vision_describe`.
+    /// Default **true**. Never applies on official Grok subscription route.
+    /// Grayed out in UI when no CLI login / official API key. Soft-respawns.
+    #[serde(default = "default_true")]
+    pub official_aux_inject: bool,
+    /// When official-aux inject is on, also load the user's other MCP servers
+    /// into the same session. Default **false** so flaky Playwright /
+    /// open-websearch handshakes do not block official-aux tools for ~30s.
+    #[serde(default)]
+    pub official_aux_with_user_mcp: bool,
+    /// When true, spawn agents with top-level `--no-ask-user` so the agent
+    /// does not emit `ask_user_question` questionnaires (CLI ≥ 0.2.117).
+    /// Default false (CLI default — agent may still ask). Soft-respawn on change.
+    /// Per-session override: [`SessionMeta::no_ask_user`].
+    #[serde(default)]
+    pub no_ask_user: bool,
+    /// Built-in tool ids to deny via top-level `grok --disallowed-tools a,b`.
+    /// Default empty (CLI default — all tools available). Coexists with
+    /// [`Self::disable_web_search`]; changing the list soft-respawns agents.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disallowed_tools: Vec<String>,
+    /// Built-in tool ids to allow via top-level `grok --tools a,b`.
+    /// Default empty = omit flag (CLI default — all tools). When non-empty,
+    /// restricts the agent to the listed tools. Coexists with
+    /// [`Self::disallowed_tools`] (allowlist restricts; denylist still applies).
+    /// Changing the list soft-respawns agents.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_tools: Vec<String>,
+    /// Enable CLI TodoGate (turn-end nudge when todos are still pending /
+    /// in_progress). Default **false** (CLI built-in default). When true, spawn
+    /// passes top-level `--todo-gate` (CLI 0.2.117+; overrides remote
+    /// `todo_gate_enabled`). Independent mode also writes agent-home
+    /// `todo_gate_enabled` / `todo_gate_max_fires_per_prompt`. Soft-respawns.
+    #[serde(default)]
+    pub todo_gate_enabled: bool,
+    /// Cap TodoGate fires per prompt (1–20). Default 3. Written to independent
+    /// agent-home config as `todo_gate_max_fires_per_prompt`. Soft-respawns.
+    #[serde(default = "default_todo_gate_max_fires")]
+    pub todo_gate_max_fires_per_prompt: u32,
+    /// Reopen the last active chat once after launch (default **false** —
+    /// start on a draft new-chat page; opt-in via Settings).
+    #[serde(default = "default_reopen_last_session")]
+    pub reopen_last_session: bool,
+    /// Last successfully opened / switched session (for startup restore).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_session_id: Option<String>,
+    /// Project of [`Self::last_session_id`] when it belonged to one (hint only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_project_id: Option<String>,
+    /// Sidebar project folders the user collapsed (ids). Missing id ⇒ expanded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sidebar_collapsed_project_ids: Vec<String>,
+    /// One-shot: crowded trees auto-collapsed once (#1230). After this, an
+    /// empty collapsed list means the user expanded every folder.
+    #[serde(default)]
+    pub sidebar_collapse_default_migrated: bool,
+    /// Sidebar Default workspace (orphan) section expanded. Default **true**
+    /// (matches historical cold-start behavior). Missing field ⇒ open.
+    #[serde(default = "default_true")]
+    pub sidebar_other_sessions_open: bool,
+    /// Named sidebar Spaces (Work / Personal / …). Empty ⇒ default space only.
+    /// Membership lives in [`Self::project_space_by_id`]; this list is the catalog.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub project_spaces: Vec<ProjectSpaceRecord>,
+    /// Active Space view: `"all"` or a space id. Missing ⇒ All projects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_project_space_id: Option<String>,
+    /// projectId → spaceId. Missing / unknown / default space ⇒ unassigned.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub project_space_by_id: HashMap<String, String>,
+    /// One-shot: flipped product default so launch opens a draft new chat
+    /// (reopen-last-session defaulted to false). Existing installs run this once.
+    #[serde(default)]
+    pub startup_new_chat_default_migrated: bool,
+    /// One-shot: product effort default medium → high (Grok Build 1.0 align).
+    /// Missing field deserializes as false so existing installs migrate once.
+    #[serde(default)]
+    pub effort_default_migrated: bool,
+    /// One-shot: product official default grok-4.5 → grok-4.6.
+    /// Missing field deserializes as false so existing installs migrate once.
+    #[serde(default)]
+    pub official_model_default_migrated: bool,
+    /// One-shot: product official default grok-4.6 → grok-4.7.
+    /// Stays false until a CLI `models_cache.json` actually lists `grok-4.7`,
+    /// so an older CLI is not asked to spawn an unknown id.
+    #[serde(default)]
+    pub official_model_47_migrated: bool,
+    /// One-shot: official grok-4.6 product effort high → xhigh.
+    #[serde(default)]
+    pub official_effort_xhigh_migrated: bool,
+    /// One-shot: lift stamped session/project `effort: high` rows to xhigh
+    /// (the previous flag only migrated `settings.effort`).
+    #[serde(default)]
+    pub official_effort_xhigh_rows_migrated: bool,
+    /// One-shot: product workflows default off → on (CLI ≥0.2.111 / 1.0 align).
+    #[serde(default)]
+    pub workflows_default_migrated: bool,
+    /// When true (default), agents may enter plan mode. When false, spawn with
+    /// top-level `--no-plan` so plan mode is disabled for that process.
+    #[serde(default = "default_plan_enabled")]
+    pub plan_enabled: bool,
+    /// Allow Grok Build subagent spawning (`Agent` / task tools). Default **true**
+    /// (CLI default). When false, spawn forces `--no-subagents` + `GROK_SUBAGENTS=0`
+    /// and independent mode writes `[subagents] enabled = false`.
+    #[serde(default = "default_true")]
+    pub subagents_enabled: bool,
+    /// Enable CLI subagent worktree snapshot (CLI **0.2.117+** config
+    /// `subagent_worktree_snapshot_enabled` + env `GROK_SUBAGENT_WORKTREE_SNAPSHOT`).
+    /// Default **false** (opt-in). Independent mode writes the top-level agent-home
+    /// key; spawn sets env (soft-fail when CLI is known older). Soft-respawns.
+    #[serde(default)]
+    pub subagent_worktree_snapshot_enabled: bool,
+    /// Enable CLI auto-wake (`[features].auto_wake`): when on, Grok Build may
+    /// inject a synthetic turn after background work completes (bash / monitor /
+    /// task / loop). Default **false** (opt-in). Independent mode writes
+    /// agent-home `auto_wake_enabled` + `[features].auto_wake`. Shared mode
+    /// never rewrites `~/.grok` — spawn injects a `GROK_CONFIG` overlay instead.
+    /// Soft-respawns so the next agent process reloads. Older CLIs ignore the
+    /// overlay / key (soft-fail).
+    #[serde(default)]
+    pub auto_wake_enabled: bool,
+    /// Enable Grok Build workflows (`workflows_enabled` in agent-home config.toml).
+    /// Default **true** (aligned with Grok Build CLI ≥0.2.111 / 1.0). Workflows are
+    /// Rhai scripts under `~/.grok/workflows` / project `.grok/workflows` run by the
+    /// CLI `workflow` tool. App lists names + headless smoke/run; no visual editor.
+    /// Independent mode writes the top-level key; shared mode does not rewrite
+    /// `~/.grok`. Soft-respawns on change.
+    #[serde(default = "default_true")]
+    pub workflows_enabled: bool,
+    /// Preferred Grok Build agent definition for new agent processes
+    /// (`explore` / `plan` / `general-purpose` / custom name under `~/.grok/agents`).
+    /// Empty / `default` / `none` → omit top-level `--agent` (CLI default).
+    /// Applied at spawn only; changing it soft-respawns the live agent.
+    #[serde(default)]
+    pub preferred_agent: String,
+    /// Optional path to a Grok Build agent profile file
+    /// (`grok agent --agent-profile <PATH>`). Empty → omit the flag.
+    /// Spawn-time only; does not rewrite shared `~/.grok`. Soft-respawns on change.
+    #[serde(default)]
+    pub agent_profile_path: String,
+    /// Optional inline subagent definitions JSON for top-level
+    /// `grok --agents <JSON>`. Empty → omit the flag. Must be a JSON object map
+    /// when set; invalid values are rejected on save. Spawn-time only — does
+    /// not write into shared `~/.grok`. Soft-respawns on change.
+    #[serde(default)]
+    pub agents_json: String,
+    /// Connect local ACP agents to a shared Grok Build leader process
+    /// (`grok agent --leader`). Default **false** — each agent is a standalone
+    /// process (`--no-leader`). Advanced; multiple clients can share one backend.
+    #[serde(default)]
+    pub use_leader: bool,
+    /// OpenSSH Host aliases with watch enabled: keep a ControlMaster and
+    /// scan remote Grok sessions. Empty = none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ssh_watch_aliases: Vec<String>,
+    /// xAI realtime voice id (e.g. `eve`).
+    #[serde(default = "default_voice_id")]
+    pub voice_id: String,
+    /// When true, window close hides to tray. When false, close quits the app.
+    #[serde(default = "default_close_to_tray")]
+    pub close_to_tray: bool,
+    /// When true (default), if any scheduled automation is **enabled**, window
+    /// close still hides to tray even when [`Self::close_to_tray`] is off — so
+    /// `automation_runner` keeps ticking. Not a daemon: full quit still pauses.
+    #[serde(default = "default_true")]
+    pub keep_tray_for_schedules: bool,
+    /// macOS only: user opted into the schedules LaunchAgent helper (login +
+    /// crash restart of the **full app**). Default false. Not a headless daemon.
+    #[serde(default)]
+    pub schedules_launch_agent: bool,
+    /// Register an OS login item so the app starts at user login (default off).
+    /// Synced to the OS via tauri-plugin-autostart on change / setup.
+    #[serde(default)]
+    pub launch_at_login: bool,
+    /// Desktop notification when an agent turn finishes (default on).
+    #[serde(default = "default_true")]
+    pub notify_on_turn_done: bool,
+    /// Desktop notification when the agent requests permission (default on).
+    #[serde(default = "default_true")]
+    pub notify_on_permission: bool,
+    /// When true, dictation auto-sends on end-of-speech silence.
+    #[serde(default)]
+    pub voice_dictation_auto_send: bool,
+    /// Keep delegated agent sessions running after ending a live voice chat.
+    #[serde(default = "default_true")]
+    pub voice_keep_agents_on_end: bool,
+    /// Composer dictation STT engine: `official` (xAI, default) or `custom`
+    /// (any OpenAI-compatible `/audio/transcriptions` endpoint).
+    #[serde(default = "default_stt_engine")]
+    pub stt_engine: String,
+    /// Base URL for the custom STT engine, e.g. `https://api.groq.com/openai/v1`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stt_custom_base_url: Option<String>,
+    /// Optional upstream model id passed to the custom STT endpoint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stt_custom_model: Option<String>,
+    /// Optional language hint passed to the custom STT endpoint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stt_custom_language: Option<String>,
+    /// Chinese output script for dictation on Whisper-family custom endpoints:
+    /// `auto` (follow app UI locale) | `simplified` | `traditional`.
+    /// Sent as the `prompt` field when Chinese dictation applies.
+    #[serde(default = "default_stt_zh_script")]
+    pub stt_zh_script: String,
+    /// Outbound proxy mode: `system` (default; OS proxy / env vars), `none`
+    /// (force direct), or `manual` (use [`Self::proxy_url`]). NEW-02: without
+    /// this, restricted-network users cannot reach Grok backends at all —
+    /// Windows system proxy is registry-based and never reaches child
+    /// processes as env vars.
+    #[serde(
+        default = "default_proxy_mode",
+        deserialize_with = "deserialize_proxy_mode"
+    )]
+    pub proxy_mode: String,
+    /// Proxy URL for `manual` mode, e.g. `http://127.0.0.1:7890`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_url: Option<String>,
+    /// Comma-separated hosts that bypass the proxy (NO_PROXY semantics).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_no_proxy: Option<String>,
+    /// Allow CLI download/install when the mirror has **no** published SHA-256
+    /// sidecar even if `GROK_CLI_REQUIRE_CHECKSUM=1`. Default **false**.
+    /// Missing sidecars are already allowed by default (official mirrors omit
+    /// them); mismatch always aborts. See `cli_install::require_published_checksum`.
+    #[serde(default)]
+    pub allow_unverified_cli_install: bool,
+    /// Result of the last App-managed CLI install (`Some(true)` = sidecar matched).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_cli_checksum_verified: Option<bool>,
+    /// Tool audit ledger retention in days (`7` | `30` | `90` | `0` = unlimited).
+    /// Applied on write/rotate and via explicit prune. Default **0** (unlimited).
+    #[serde(default)]
+    pub audit_ledger_retention_days: u32,
+}
+
+fn default_composer_prefs_scope() -> String {
+    "global".into()
+}
+
+fn default_open_target() -> String {
+    "finder".into()
+}
+
+fn default_cli_backend() -> String {
+    crate::wsl_backend::CLI_BACKEND_NATIVE.into()
+}
+
+fn default_max_concurrent_agents() -> u32 {
+    crate::process_limits::DEFAULT_MAX_CONCURRENT_AGENTS
+}
+
+fn default_agent_idle_minutes() -> u32 {
+    crate::process_limits::DEFAULT_AGENT_IDLE_MINUTES
+}
+
+fn default_stream_stall_seconds() -> u32 {
+    crate::stream_stall::DEFAULT_STREAM_STALL_SECONDS
+}
+
+fn default_sandbox_profile() -> String {
+    // New installs + missing field: Workspace isolation (matches App DEFAULT_SANDBOX_PROFILE).
+    // Existing settings that already persist "off" are unchanged.
+    "workspace".into()
+}
+
+fn default_compaction_mode() -> String {
+    crate::acp_client::DEFAULT_COMPACTION_MODE.into()
+}
+
+fn default_compaction_detail() -> String {
+    crate::acp_client::DEFAULT_COMPACTION_DETAIL.into()
+}
+
+fn default_reopen_last_session() -> bool {
+    false
+}
+
+fn default_plan_enabled() -> bool {
+    true
+}
+
+pub(crate) const WALLPAPER_X_SEARCH_MODE_RESPONSES_PREVIEW: &str = "responses_preview";
+
+pub(crate) fn normalize_wallpaper_x_search_mode(value: &str) -> &'static str {
+    if value == WALLPAPER_X_SEARCH_MODE_RESPONSES_PREVIEW {
+        WALLPAPER_X_SEARCH_MODE_RESPONSES_PREVIEW
+    } else {
+        "cli"
+    }
+}
+
+fn default_wallpaper_x_search_mode() -> String {
+    "cli".into()
+}
+
+fn default_background_wait_policy() -> String {
+    "wait".into()
+}
+
+fn default_background_wait_timeout_sec() -> u32 {
+    crate::acp_client::DEFAULT_BACKGROUND_WAIT_TIMEOUT_SEC
+}
+
+fn default_voice_id() -> String {
+    "eve".into()
+}
+
+fn default_stt_engine() -> String {
+    "official".into()
+}
+
+fn default_stt_zh_script() -> String {
+    "auto".into()
+}
+
+fn default_close_to_tray() -> bool {
+    true
+}
+
+fn default_proxy_mode() -> String {
+    PROXY_MODE_SYSTEM.into()
+}
+
+pub const PROXY_MODE_SYSTEM: &str = "system";
+pub const PROXY_MODE_MANUAL: &str = "manual";
+pub const PROXY_MODE_NONE: &str = "none";
+const LEGACY_PROXY_MODE_USE: &str = "use";
+
+/// Normalize persisted / IPC proxy modes. The legacy effective-decision label
+/// `use` is only treated as Manual when a valid saved URL proves that intent;
+/// without one it safely falls back to System.
+pub fn normalize_proxy_mode(raw: &str, proxy_url: Option<&str>) -> &'static str {
+    let mode = raw.trim().to_ascii_lowercase();
+    match mode.as_str() {
+        PROXY_MODE_MANUAL | "custom" | "url" => PROXY_MODE_MANUAL,
+        PROXY_MODE_NONE | "direct" | "off" | "disabled" | "no-proxy" | "noproxy" | "no_proxy" => {
+            PROXY_MODE_NONE
+        }
+        LEGACY_PROXY_MODE_USE
+            if proxy_url
+                .map(str::trim)
+                .filter(|url| !url.is_empty())
+                .is_some_and(crate::proxy::is_valid_proxy_url) =>
+        {
+            PROXY_MODE_MANUAL
+        }
+        PROXY_MODE_SYSTEM | "os" | "auto" | "default" | "" => PROXY_MODE_SYSTEM,
+        _ => PROXY_MODE_SYSTEM,
+    }
+}
+
+/// Canonicalize the cross-field proxy contract after AppSettings has been
+/// deserialized. Returns true when the in-memory value changed.
+pub fn normalize_proxy_settings(settings: &mut AppSettings) -> bool {
+    let normalized = normalize_proxy_mode(&settings.proxy_mode, settings.proxy_url.as_deref());
+    if settings.proxy_mode == normalized {
+        return false;
+    }
+    settings.proxy_mode = normalized.into();
+    true
+}
+
+/// Preserve string values long enough for cross-field normalization to inspect
+/// `proxy_url`; non-string values fail closed to System.
+fn deserialize_proxy_mode<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(value
+        .as_str()
+        .map(|raw| raw.trim().to_ascii_lowercase())
+        .unwrap_or_else(default_proxy_mode))
+}
+
+fn default_todo_gate_max_fires() -> u32 {
+    crate::agent_todo_gate::DEFAULT_TODO_GATE_MAX_FIRES
+}
+
+fn default_locale() -> String {
+    "system".into()
+}
+
+fn default_session_data_mode() -> String {
+    "shared".into()
+}
+
+fn default_composer_editor() -> String {
+    "legacy".into()
+}
+
+/// Persist only the two composer editor ids. Anything else is the built-in editor.
+pub fn normalize_composer_editor(raw: &str) -> &'static str {
+    if raw.trim() == "tiptap" {
+        "tiptap"
+    } else {
+        "legacy"
+    }
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            theme: "system".into(),
+            // Follow OS language (zh / zh-TW / en). Users can lock a catalog in Settings.
+            locale: default_locale(),
+            locale_follow_system_migrated: true,
+            // Product default: share GROK_HOME (~/.grok) with terminal Grok Build CLI.
+            // Existing installs keep whatever is already persisted in settings.json.
+            session_data_mode: "shared".into(),
+            manual_cli_path: None,
+            cli_backend: default_cli_backend(),
+            wsl_distro: None,
+            wsl_cli_path: None,
+            wsl_grok_home: None,
+            permission_policy: "ask".into(),
+            model_id: Some(DEFAULT_OFFICIAL_MODEL_ID.into()),
+            effort: Some("xhigh".into()),
+            mode: "agent".into(),
+            onboarding_done: false,
+            setup_skipped: false,
+            setup_wizard_completed: false,
+            auth_setup_deferred: false,
+            default_open_target: default_open_target(),
+            composer_prefs_scope: default_composer_prefs_scope(),
+            composer_editor: default_composer_editor(),
+            acp_server_addr: None,
+            max_concurrent_agents: default_max_concurrent_agents(),
+            agent_idle_minutes: default_agent_idle_minutes(),
+            // Fresh installs already start on the current default.
+            pool_size_migrated: true,
+            stream_stall_seconds: default_stream_stall_seconds(),
+            stream_stall_default_migrated: true,
+            store_api_keys_in_keychain: false,
+            sandbox_profile: default_sandbox_profile(),
+            multi_root_workspace_enabled: true,
+            recent_workspace_id: None,
+            experimental_memory: false,
+            compaction_mode: default_compaction_mode(),
+            compaction_detail: default_compaction_detail(),
+            two_pass_compaction_enabled: false,
+            max_agent_turns: None,
+            background_wait_policy: default_background_wait_policy(),
+            wallpaper_x_search_mode: default_wallpaper_x_search_mode(),
+            background_wait_timeout_sec: default_background_wait_timeout_sec(),
+            include_partial_messages: false,
+            disable_web_search: false,
+            official_aux_inject: true,
+            official_aux_with_user_mcp: false,
+            no_ask_user: false,
+            disallowed_tools: Vec::new(),
+            allowed_tools: Vec::new(),
+            todo_gate_enabled: false,
+            todo_gate_max_fires_per_prompt: default_todo_gate_max_fires(),
+            reopen_last_session: default_reopen_last_session(),
+            last_session_id: None,
+            last_project_id: None,
+            sidebar_collapsed_project_ids: Vec::new(),
+            sidebar_collapse_default_migrated: false,
+            sidebar_other_sessions_open: true,
+            project_spaces: Vec::new(),
+            active_project_space_id: None,
+            project_space_by_id: HashMap::new(),
+            // Fresh defaults already match the new-chat-on-launch product rule.
+            startup_new_chat_default_migrated: true,
+            // Fresh installs already use 1.0-aligned effort / workflows defaults.
+            effort_default_migrated: true,
+            official_model_default_migrated: true,
+            official_model_47_migrated: true,
+            official_effort_xhigh_migrated: true,
+            official_effort_xhigh_rows_migrated: true,
+            workflows_default_migrated: true,
+            plan_enabled: default_plan_enabled(),
+            subagents_enabled: true,
+            subagent_worktree_snapshot_enabled: false,
+            auto_wake_enabled: false,
+            workflows_enabled: true,
+            preferred_agent: String::new(),
+            agent_profile_path: String::new(),
+            agents_json: String::new(),
+            use_leader: false,
+            ssh_watch_aliases: Vec::new(),
+            voice_id: default_voice_id(),
+            voice_dictation_auto_send: false,
+            voice_keep_agents_on_end: true,
+            stt_engine: default_stt_engine(),
+            stt_custom_base_url: None,
+            stt_custom_model: None,
+            stt_custom_language: None,
+            stt_zh_script: default_stt_zh_script(),
+
+            close_to_tray: default_close_to_tray(),
+            keep_tray_for_schedules: true,
+            schedules_launch_agent: false,
+            launch_at_login: false,
+            notify_on_turn_done: true,
+            notify_on_permission: true,
+            proxy_mode: default_proxy_mode(),
+            proxy_url: None,
+            proxy_no_proxy: None,
+            allow_unverified_cli_install: false,
+            last_cli_checksum_verified: None,
+            audit_ledger_retention_days: 0,
+        }
+    }
+}
+
+/// App-owned secrets surface (backend-agnostic).
+///
+/// Sensitive fields (`official_api_key`, `relay_api_key`) prefer the OS keychain
+/// (macOS Keychain / Windows Credential Manager / Linux Secret Service) with a
+/// `secrets.json` (0600) fallback. See [`crate::secrets`].
+///
+/// Never log these fields.
+///
+/// `keychain_has_*` are non-secret booleans written to `secrets.json` so the UI
+/// can report "has a key" without unlocking the OS keychain on every launch.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretsFile {
+    /// Pexels wallpaper-library API credential, retained only in Host secrets.
+    #[serde(default)]
+    pub pexels_api_key: Option<String>,
+    pub official_api_key: Option<String>,
+    pub relay_base_url: Option<String>,
+    pub relay_api_key: Option<String>,
+    pub default_model: Option<String>,
+    /// Custom STT endpoint API key (OpenAI-compatible `stt.engine = custom`).
+    /// Deprecated single slot (ADR-0001): folded into `stt_custom_api_keys`
+    /// under the `custom` slot at load time; kept only for reading old files.
+    #[serde(default)]
+    pub stt_custom_api_key: Option<String>,
+    /// Per-provider custom STT keys (ADR-0001): provider preset id → key.
+    #[serde(default)]
+    pub stt_custom_api_keys: HashMap<String, String>,
+    /// Non-secret per-provider presence flags (mirrors `keychain_has_*`):
+    /// always persisted on disk so the settings UI can show "saved" even when
+    /// key values live only in the OS keychain.
+    #[serde(default)]
+    pub stt_custom_key_presence: HashMap<String, bool>,
+    /// Official API key lives in OS keychain (value not on disk).
+    #[serde(default)]
+    pub keychain_has_official: bool,
+    /// Relay API key lives in OS keychain (value not on disk).
+    #[serde(default)]
+    pub keychain_has_relay: bool,
+    #[serde(default)]
+    pub keychain_has_pexels: bool,
+    /// Custom STT key lives in OS keychain (value not on disk).
+    #[serde(default)]
+    pub keychain_has_stt_custom: bool,
+}
+
+/// File/image card persisted with a chat message (user attach or agent image_gen).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageAttachmentStored {
+    pub path: String,
+    pub name: String,
+    #[serde(default)]
+    pub is_dir: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessageStored {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+    pub thought: Option<String>,
+    pub created_at: DateTime<Utc>,
+    /// True when this assistant row records a turn failure (retries exhausted, etc.).
+    #[serde(default)]
+    pub is_error: bool,
+    /// Local file cards (e.g. image_gen output paths).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<MessageAttachmentStored>>,
+    /// UI marker type, e.g. `context_compact` for agent auto/manual compaction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marker: Option<String>,
+}
+
+fn read_json<T: for<'de> Deserialize<'de> + Default>(path: &PathBuf) -> T {
+    match fs::read_to_string(path) {
+        Ok(s) => serde_json::from_str(&s).unwrap_or_default(),
+        Err(_) => T::default(),
+    }
+}
+
+/// Last quarantined store path (corrupt JSON recovered). Taken once by the UI.
+static LAST_STORE_QUARANTINE: Mutex<Option<String>> = Mutex::new(None);
+
+/// Read JSON; if the file exists but is corrupt, quarantine it and return default.
+pub(crate) fn read_json_recover<T: for<'de> Deserialize<'de> + Default>(path: &PathBuf) -> T {
+    match fs::read_to_string(path) {
+        Ok(s) if s.trim().is_empty() => T::default(),
+        Ok(s) => match serde_json::from_str(&s) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(
+                    "corrupt store file {} ({e}); quarantining and starting empty",
+                    path.display()
+                );
+                let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+                let bak = path.with_extension(format!("corrupt-{stamp}.json"));
+                let _ = fs::rename(path, &bak);
+                if let Ok(mut g) = LAST_STORE_QUARANTINE.lock() {
+                    *g = Some(bak.display().to_string());
+                }
+                T::default()
+            }
+        },
+        Err(_) => T::default(),
+    }
+}
+
+/// Pop the most recent store quarantine path (if any) for a one-shot UI notice.
+pub fn take_store_quarantine() -> Option<String> {
+    LAST_STORE_QUARANTINE.lock().ok().and_then(|mut g| g.take())
+}
+
+pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
+    let s = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
+    // Exclusive lock + temp rename so shared-mode / dual-instance writes do not
+    // leave a half-written index (E06).
+    crate::store_lock::write_bytes_atomic(path, s.as_bytes())
+}
+
+pub fn load_settings() -> AppSettings {
+    let _ = ensure_app_dirs();
+    let mut s: AppSettings = read_json(&settings_file());
+    // Compatibility: `use` was an effective network decision label, never a
+    // persisted settings mode. Some local snapshots nevertheless contain it.
+    // A valid saved URL is the only evidence that it represented Manual.
+    if normalize_proxy_settings(&mut s) {
+        tracing::info!(
+            "settings migration: normalized proxyMode to {}",
+            s.proxy_mode
+        );
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: installs that already stored keys in keychain before the opt-in
+    // keep keychain mode so keys remain reachable without a silent loss.
+    if !s.store_api_keys_in_keychain {
+        let disk = crate::secrets::load_secrets_disk_only();
+        if disk.keychain_has_official || disk.keychain_has_relay {
+            s.store_api_keys_in_keychain = true;
+            let _ = write_json(&settings_file(), &s);
+        }
+    }
+    // One-time: installs predating the multi-session rework persisted the old
+    // default pool size (3). Without this they stay at three warm agents and
+    // hit the process limit while browsing a couple of chats.
+    if let Some(next) =
+        crate::process_limits::migrate_max_concurrent(s.max_concurrent_agents, s.pool_size_migrated)
+    {
+        tracing::info!(
+            "settings migration: maxConcurrentAgents {} → {}",
+            s.max_concurrent_agents,
+            next
+        );
+        s.max_concurrent_agents = next;
+        s.pool_size_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    } else if !s.pool_size_migrated {
+        s.pool_size_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: stream stall soft window 120/180 → 600 (10 min). Installs that
+    // only ever stored the product default must not keep false-stalling; a
+    // deliberate custom value is left alone (flag still set so we do not re-ask).
+    if let Some(next) = crate::stream_stall::migrate_stream_stall_seconds(
+        s.stream_stall_seconds,
+        s.stream_stall_default_migrated,
+    ) {
+        tracing::info!(
+            "settings migration: streamStallSeconds {} → {}",
+            s.stream_stall_seconds,
+            next
+        );
+        s.stream_stall_seconds = next;
+        s.stream_stall_default_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    } else if !s.stream_stall_default_migrated {
+        s.stream_stall_default_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: product default is draft new-chat on launch (not restore last).
+    // Prior builds defaulted reopen_last_session=true, so existing settings
+    // keep restoring a chat and look like "first session selected" on every boot.
+    if !s.startup_new_chat_default_migrated {
+        s.reopen_last_session = false;
+        s.startup_new_chat_default_migrated = true;
+        tracing::info!("settings migration: reopenLastSession → false (start on new chat)");
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: Grok Build 1.0 effort default medium → high. Unset / empty /
+    // legacy product default medium lift to high; deliberate low/high/max kept.
+    if !s.effort_default_migrated {
+        if let Some(next) = migrate_legacy_effort_default(s.effort.as_deref()) {
+            tracing::info!(
+                "settings migration: effort {:?} → {} (Grok Build 1.0 default)",
+                s.effort,
+                next
+            );
+            s.effort = Some(next);
+        }
+        s.effort_default_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: official catalog default grok-4.5 → grok-4.6. Unset / empty /
+    // legacy product default grok-4.5 lift; deliberate other ids kept.
+    if !s.official_model_default_migrated {
+        if let Some(next) = migrate_legacy_official_model_default(s.model_id.as_deref()) {
+            tracing::info!(
+                "settings migration: modelId {:?} → {} (Grok 4.6 default)",
+                s.model_id,
+                next
+            );
+            s.model_id = Some(next);
+        }
+        s.official_model_default_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: official catalog default grok-4.6 → grok-4.7. Unset / empty /
+    // the previous product default grok-4.6 lift. Explicit grok-4.5, Fast,
+    // and custom ids stay. Skip until the CLI cache lists grok-4.7.
+    if !s.official_model_47_migrated
+        && crate::models_catalog::official_caches_have_model(
+            &s.session_data_mode,
+            DEFAULT_OFFICIAL_MODEL_ID,
+        )
+    {
+        if let Some(next) = migrate_official_model_46_to_47(s.model_id.as_deref()) {
+            tracing::info!(
+                "settings migration: modelId {:?} → {} (Grok 4.7 default)",
+                s.model_id,
+                next
+            );
+            s.model_id = Some(next);
+        }
+        s.official_model_47_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: official 4.6 product effort high → xhigh. Unset / empty / the
+    // previous product default high lift; deliberate low/medium/max stay.
+    // Skip custom-provider route ids (not grok-* / empty).
+    if !s.official_effort_xhigh_migrated {
+        if official_route_should_default_xhigh(s.model_id.as_deref()) {
+            if let Some(next) = migrate_official_effort_to_xhigh(s.effort.as_deref()) {
+                tracing::info!(
+                    "settings migration: effort {:?} → {} (Grok 4.6 default)",
+                    s.effort,
+                    next
+                );
+                s.effort = Some(next);
+            }
+        }
+        s.official_effort_xhigh_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    if !s.official_effort_xhigh_rows_migrated {
+        migrate_official_effort_xhigh_rows(s.model_id.as_deref());
+        s.official_effort_xhigh_rows_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: factory UI locale `en` → `system` so Chinese (and other)
+    // OS languages apply on first launch / existing installs that never
+    // locked a language. Explicit zh / zh-TW / system stay.
+    if !s.locale_follow_system_migrated {
+        if let Some(next) = migrate_legacy_locale_default(Some(s.locale.as_str())) {
+            tracing::info!(
+                "settings migration: locale {:?} → {} (follow OS language)",
+                s.locale,
+                next
+            );
+            s.locale = next;
+        }
+        s.locale_follow_system_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    // One-time: product workflows default off → on (CLI ≥0.2.111 / 1.0).
+    // Only lifts false → true once; users who turn it off again stay off.
+    if !s.workflows_default_migrated {
+        if !s.workflows_enabled {
+            tracing::info!("settings migration: workflowsEnabled false → true (CLI default)");
+            s.workflows_enabled = true;
+            let _ =
+                crate::agent_workflows::sync_workflows_to_agent_profile(&s.session_data_mode, true);
+        }
+        s.workflows_default_migrated = true;
+        let _ = write_json(&settings_file(), &s);
+    }
+    s
+}
+
+/// Product default effort for cold start / fallback (Grok Build 1.0 = high).
+pub const DEFAULT_REASONING_EFFORT: &str = "high";
+
+/// One-shot effort migration: lift unset / empty / legacy `"medium"` product
+/// default to [`DEFAULT_REASONING_EFFORT`]. Returns `Some(new)` when the stored
+/// value should change; `None` when it should be left alone (already high, or
+/// deliberate low/max/custom). Callers still set the migrated flag either way.
+pub fn migrate_legacy_effort_default(stored: Option<&str>) -> Option<String> {
+    match stored.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Some(DEFAULT_REASONING_EFFORT.into()),
+        Some("medium") => Some(DEFAULT_REASONING_EFFORT.into()),
+        Some(_) => None,
+    }
+}
+
+/// Previous product default. The 4.5 → 4.6 one-shot still lands here; a later
+/// one-shot lifts this id to [`DEFAULT_OFFICIAL_MODEL_ID`].
+const PREVIOUS_OFFICIAL_MODEL_ID: &str = "grok-4.6";
+
+/// Product default official catalog model (Grok 4.7, 2026-09).
+pub const DEFAULT_OFFICIAL_MODEL_ID: &str = "grok-4.7";
+
+/// One-shot official-model migration: lift unset / empty / legacy `"grok-4.5"`
+/// product default to [`PREVIOUS_OFFICIAL_MODEL_ID`]. Explicit other ids stay.
+pub fn migrate_legacy_official_model_default(stored: Option<&str>) -> Option<String> {
+    match stored.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Some(PREVIOUS_OFFICIAL_MODEL_ID.into()),
+        Some("grok-4.5") => Some(PREVIOUS_OFFICIAL_MODEL_ID.into()),
+        Some(_) => None,
+    }
+}
+
+/// One-shot: lift unset / empty / previous product default `"grok-4.6"` to
+/// [`DEFAULT_OFFICIAL_MODEL_ID`]. Explicit 4.5, Fast, and custom ids stay.
+pub fn migrate_official_model_46_to_47(stored: Option<&str>) -> Option<String> {
+    match stored.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Some(DEFAULT_OFFICIAL_MODEL_ID.into()),
+        Some(PREVIOUS_OFFICIAL_MODEL_ID) => Some(DEFAULT_OFFICIAL_MODEL_ID.into()),
+        Some(_) => None,
+    }
+}
+
+/// One-shot: lift the old factory locale `"en"` (or empty) to `"system"`.
+/// Explicit `zh` / `zh-TW` / `system` / other catalog ids stay.
+pub fn migrate_legacy_locale_default(stored: Option<&str>) -> Option<String> {
+    match stored.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Some("system".into()),
+        Some(v) if v.eq_ignore_ascii_case("en") => Some("system".into()),
+        Some(_) => None,
+    }
+}
+
+pub const DEFAULT_OFFICIAL_EFFORT: &str = "xhigh";
+
+fn official_route_should_default_xhigh(model_id: Option<&str>) -> bool {
+    match model_id.map(str::trim).filter(|s| !s.is_empty()) {
+        None => true,
+        Some(id) => id.starts_with("grok-"),
+    }
+}
+
+/// Lift unset / empty / previous official default `"high"` to xhigh.
+pub fn migrate_official_effort_to_xhigh(stored: Option<&str>) -> Option<String> {
+    match stored.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Some(DEFAULT_OFFICIAL_EFFORT.into()),
+        Some("high") => Some(DEFAULT_OFFICIAL_EFFORT.into()),
+        Some(_) => None,
+    }
+}
+
+/// Session / project row: lift `high` → `xhigh` only for official 4.6 (or
+/// inherited global official 4.6). grok-4.5 and custom ids stay put.
+pub fn row_should_lift_official_high_to_xhigh(
+    row_model_id: Option<&str>,
+    row_effort: Option<&str>,
+    global_model_id: Option<&str>,
+) -> bool {
+    if row_effort.map(str::trim) != Some("high") {
+        return false;
+    }
+    match row_model_id.map(str::trim).filter(|s| !s.is_empty()) {
+        None => official_route_should_default_xhigh(global_model_id),
+        Some("grok-4.6") => true,
+        Some(_) => false,
+    }
+}
+
+fn migrate_official_effort_xhigh_rows(global_model_id: Option<&str>) {
+    if let Err(e) = update_sessions_index(|sessions| {
+        for s in sessions {
+            if row_should_lift_official_high_to_xhigh(
+                s.model_id.as_deref(),
+                s.effort.as_deref(),
+                global_model_id,
+            ) {
+                s.effort = Some(DEFAULT_OFFICIAL_EFFORT.into());
+            }
+        }
+        Ok(())
+    }) {
+        tracing::warn!("effort row migration: sessions_index: {e}");
+    }
+    let mut projects = load_projects();
+    let mut projects_changed = false;
+    for p in &mut projects {
+        if row_should_lift_official_high_to_xhigh(
+            p.model_id.as_deref(),
+            p.effort.as_deref(),
+            global_model_id,
+        ) {
+            p.effort = Some(DEFAULT_OFFICIAL_EFFORT.into());
+            projects_changed = true;
+        }
+    }
+    if projects_changed {
+        if let Err(e) = save_projects(&projects) {
+            tracing::warn!("effort row migration: projects: {e}");
+        }
+    }
+}
+
+/// Clamp a remembered effort to the catalog of the resolved model.
+/// grok-4.5 has no xhigh → high. Unknown / custom catalogs are left alone.
+pub fn clamp_effort_for_model(model_id: &str, effort: &str) -> String {
+    let allowed: &[&str] = match model_id.trim() {
+        "grok-4.5" => &["low", "medium", "high"],
+        "" | "grok-4.6" => &["low", "medium", "high", "xhigh"],
+        id if id.starts_with("grok-") => &["low", "medium", "high", "xhigh"],
+        _ => return effort.to_string(),
+    };
+    if allowed
+        .iter()
+        .any(|id| id.eq_ignore_ascii_case(effort.trim()))
+    {
+        return effort.to_string();
+    }
+    // Only clamp the official overflow: 4.5 has no xhigh → high.
+    // Leave custom / unknown ids (e.g. max) untouched.
+    if effort.trim().eq_ignore_ascii_case("xhigh")
+        && allowed.iter().any(|a| a.eq_ignore_ascii_case("high"))
+    {
+        return "high".to_string();
+    }
+    effort.to_string()
+}
+
+pub fn save_settings(s: &AppSettings) -> Result<(), String> {
+    let _ = ensure_app_dirs();
+    let mut normalized = s.clone();
+    normalize_proxy_settings(&mut normalized);
+    write_json(&settings_file(), &normalized)
+}
+
+/// Async-context variant of [`load_settings`]. The settings file sits behind
+/// an exclusive lock and `load_settings` may even rewrite it during one-time
+/// migrations, so async commands must not block their worker on the IO
+/// (same class as the git_status blocking-pool fix in #990).
+pub async fn load_settings_async() -> AppSettings {
+    // JoinError can only come from a panic inside load_settings itself,
+    // which already falls back to defaults on IO failure.
+    tokio::task::spawn_blocking(load_settings)
+        .await
+        .unwrap_or_default()
+}
+
+/// Async-context variant of [`save_settings`].
+pub async fn save_settings_async(s: &AppSettings) -> Result<(), String> {
+    let s = s.clone();
+    tokio::task::spawn_blocking(move || save_settings(&s))
+        .await
+        .map_err(|e| format!("settings save task failed: {e}"))?
+}
+
+/// Stable pin partition: all pinned first, then unpinned.
+/// Relative order within each group is preserved (user order / file order).
+/// Does **not** sort by `last_opened_at` — sidebar order is manual.
+pub fn apply_project_pin_partition(list: &mut Vec<Project>) {
+    let mut pinned = Vec::with_capacity(list.len());
+    let mut unpinned = Vec::with_capacity(list.len());
+    for p in list.drain(..) {
+        if p.pinned {
+            pinned.push(p);
+        } else {
+            unpinned.push(p);
+        }
+    }
+    list.extend(pinned);
+    list.extend(unpinned);
+}
+
+/// Rebuild project list from an explicit id order, then pin-partition.
+/// Unknown ids are skipped; projects missing from `ordered_ids` are appended
+/// in their previous relative order (then partitioned).
+pub fn reorder_projects_by_ids(list: &[Project], ordered_ids: &[String]) -> Vec<Project> {
+    let mut by_id: std::collections::HashMap<String, Project> =
+        list.iter().cloned().map(|p| (p.id.clone(), p)).collect();
+    let mut next = Vec::with_capacity(list.len());
+    let mut seen = std::collections::HashSet::new();
+    for id in ordered_ids {
+        if seen.contains(id) {
+            continue;
+        }
+        if let Some(p) = by_id.remove(id) {
+            seen.insert(id.clone());
+            next.push(p);
+        }
+    }
+    // Preserve prior relative order for anything not in ordered_ids.
+    for p in list {
+        if !seen.contains(&p.id) {
+            if let Some(rest) = by_id.remove(&p.id) {
+                next.push(rest);
+            }
+        }
+    }
+    apply_project_pin_partition(&mut next);
+    next
+}
+
+pub fn load_projects() -> Vec<Project> {
+    let _ = ensure_app_dirs();
+    let _ = ensure_general_workspace_dir();
+    let mut list: Vec<Project> = read_json_recover(&projects_file());
+    // One-shot migration: drop the temporary system:general project row and
+    // rehome its sessions to orphan (`project_id = None`) under Default workspace.
+    migrate_legacy_general_project(&mut list);
+    let mut dirty = apply_ssh_path_health(&mut list);
+    dirty |= dedup_ssh_projects_by_alias_path(&mut list);
+    // Pin group first; keep manual order within each group (no last_opened sort).
+    apply_project_pin_partition(&mut list);
+    if dirty {
+        // Persist repaired ssh_alias / merged duplicates. Nested load via
+        // path_scope is a no-op once the file already has the alias.
+        if let Err(e) = save_projects(&list) {
+            tracing::warn!("repair ssh project rows: {e}");
+        }
+    }
+    list
+}
+
+/// Ensure `{app_data}/workspaces/general` exists (orphan chat default cwd).
+/// Not registered as a sidebar project.
+pub fn ensure_general_workspace_dir() -> Result<std::path::PathBuf, String> {
+    let _ = ensure_app_dirs();
+    let dir = crate::paths::general_workspace_dir();
+    fs::create_dir_all(&dir).map_err(|e| format!("create general workspace: {e}"))?;
+    Ok(dir)
+}
+
+/// Absolute path of the general workspace directory (creates it if missing).
+pub fn general_workspace_path_string() -> Result<String, String> {
+    Ok(ensure_general_workspace_dir()?
+        .to_string_lossy()
+        .to_string())
+}
+
+/// Remove legacy `system:general` from the projects list and clear those
+/// session bindings so chats appear under Default workspace.
+fn migrate_legacy_general_project(list: &mut Vec<Project>) {
+    let had_row = list.iter().any(|p| p.is_legacy_general());
+    if !had_row {
+        // Still rehome sessions that point at the retired id (index-only leftover).
+        rehome_general_sessions();
+        return;
+    }
+    list.retain(|p| !p.is_legacy_general());
+    // Raw write: avoid save_projects → path_scope → load_projects recursion.
+    let _ = write_json(&projects_file(), &list);
+    rehome_general_sessions();
+    crate::path_scope::refresh_from_store();
+}
+
+fn rehome_general_sessions() {
+    let _ = update_sessions_index(|sessions| {
+        for s in sessions {
+            if s.project_id.as_deref() == Some(GENERAL_PROJECT_ID) {
+                s.project_id = None;
+            }
+        }
+        Ok(())
+    });
+}
+
+pub fn save_projects(list: &[Project]) -> Result<(), String> {
+    write_json(&projects_file(), &list)?;
+    crate::path_scope::refresh_from_store();
+    Ok(())
+}
+
+pub fn add_project(path: String, trust: bool) -> Result<Project, String> {
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.is_dir() {
+        return Err("path is not a directory".into());
+    }
+    let name = path_buf
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.clone());
+    let mut list = load_projects();
+    if let Some(existing) = list.iter_mut().find(|p| p.path == path) {
+        existing.trusted = trust || existing.trusted;
+        existing.last_opened_at = Utc::now();
+        existing.path_ok = true;
+        let clone = existing.clone();
+        save_projects(&list)?;
+        return Ok(clone);
+    }
+    let p = Project {
+        id: Uuid::new_v4().to_string(),
+        name,
+        path,
+        trusted: trust,
+        last_opened_at: Utc::now(),
+        path_ok: true,
+        pinned: false,
+        system: false,
+        model_id: None,
+        effort: None,
+        mode: None,
+        permission_policy: None,
+        sandbox_profile: None,
+        color: None,
+        ssh_alias: None,
+    };
+    // New projects land at the end of the unpinned group (after pin partition).
+    list.push(p.clone());
+    apply_project_pin_partition(&mut list);
+    save_projects(&list)?;
+    Ok(p)
+}
+
+/// Register a remote OpenSSH folder as a project. `path` is the remote cwd.
+pub fn add_ssh_project(alias: &str, path: String, trust: bool) -> Result<Project, String> {
+    if !crate::ssh_remote::is_safe_ssh_alias(alias) {
+        return Err("invalid SSH alias".into());
+    }
+    let path = path.trim().to_string();
+    if path.is_empty() || path.contains('\0') {
+        return Err("invalid remote path".into());
+    }
+    let name = PathBuf::from(&path)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| path.clone());
+    let label = format!("{alias}:{name}");
+    let mut list = load_projects();
+    if let Some(existing) = list
+        .iter_mut()
+        .find(|p| ssh_alias_of(p) == Some(alias) && p.path == path)
+    {
+        existing.trusted = trust || existing.trusted;
+        existing.last_opened_at = Utc::now();
+        existing.path_ok = true;
+        let clone = existing.clone();
+        save_projects(&list)?;
+        return Ok(clone);
+    }
+    // Same remote cwd, alias dropped (older builds) — restore instead of duplicating.
+    if let Some(existing) = list
+        .iter_mut()
+        .find(|p| p.path == path && ssh_alias_of(p).is_none())
+    {
+        existing.ssh_alias = Some(alias.to_string());
+        existing.trusted = trust || existing.trusted;
+        existing.last_opened_at = Utc::now();
+        existing.path_ok = true;
+        let clone = existing.clone();
+        save_projects(&list)?;
+        return Ok(clone);
+    }
+    let p = Project {
+        id: Uuid::new_v4().to_string(),
+        name: label,
+        path,
+        trusted: trust,
+        last_opened_at: Utc::now(),
+        path_ok: true,
+        pinned: false,
+        system: false,
+        model_id: None,
+        effort: None,
+        mode: None,
+        permission_policy: None,
+        sandbox_profile: None,
+        color: None,
+        ssh_alias: Some(alias.to_string()),
+    };
+    list.push(p.clone());
+    apply_project_pin_partition(&mut list);
+    save_projects(&list)?;
+    Ok(p)
+}
+
+/// Persist a user-defined sidebar project order.
+/// Pin groups are re-applied so unpinned items cannot sit above pinned ones.
+pub fn reorder_projects(ordered_ids: Vec<String>) -> Result<Vec<Project>, String> {
+    let list = load_projects();
+    if list.is_empty() {
+        return Ok(list);
+    }
+    let next = reorder_projects_by_ids(&list, &ordered_ids);
+    save_projects(&next)?;
+    Ok(next)
+}
+
+/// Remove project from the app list only — does **not** delete the disk folder
+/// or any chat sessions (sessions keep their project_id and become orphans).
+pub fn remove_project(id: &str) -> Result<(), String> {
+    if id == GENERAL_PROJECT_ID {
+        // Already retired; treat as success so old clients cannot soft-lock.
+        return Ok(());
+    }
+    let mut list = load_projects();
+    list.retain(|p| p.id != id);
+    save_projects(&list)
+}
+
+/// Point a project at a new directory (folder moved / renamed on disk).
+/// Requires the path to exist as a directory; re-checks and sets `path_ok`.
+pub fn relocate_project(id: &str, new_path: String) -> Result<Project, String> {
+    let path_buf = PathBuf::from(&new_path);
+    if !path_buf.is_dir() {
+        return Err("path is not a directory".into());
+    }
+    let mut list = load_projects();
+    if list.iter().any(|p| p.id != id && p.path == new_path) {
+        return Err("another project already uses this path".into());
+    }
+    let p = list
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or_else(|| "project not found".to_string())?;
+    p.path = new_path;
+    p.path_ok = true;
+    p.last_opened_at = Utc::now();
+    let clone = p.clone();
+    save_projects(&list)?;
+    Ok(clone)
+}
+
+pub fn rename_project(id: &str, name: &str) -> Result<Project, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("name empty".into());
+    }
+    let mut list = load_projects();
+    let p = list
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or_else(|| "project not found".to_string())?;
+    p.name = name.to_string();
+    let clone = p.clone();
+    save_projects(&list)?;
+    Ok(clone)
+}
+
+pub fn set_project_pinned(id: &str, pinned: bool) -> Result<Project, String> {
+    let mut list = load_projects();
+    let idx = list
+        .iter()
+        .position(|p| p.id == id)
+        .ok_or_else(|| "project not found".to_string())?;
+    if list[idx].pinned == pinned {
+        return Ok(list[idx].clone());
+    }
+    let mut p = list.remove(idx);
+    p.pinned = pinned;
+    // Pin → end of pinned group; unpin → end of list (unpinned group).
+    if pinned {
+        let insert_at = list.iter().filter(|x| x.pinned).count();
+        list.insert(insert_at, p.clone());
+    } else {
+        list.push(p.clone());
+    }
+    apply_project_pin_partition(&mut list);
+    save_projects(&list)?;
+    Ok(p)
+}
+
+/// Named project accent tokens (sidebar color dot).
+pub const PROJECT_COLOR_TOKENS: &[&str] = &["blue", "green", "orange", "purple", "pink", "gray"];
+
+/// Normalize a project color value.
+///
+/// Accepts:
+/// - named tokens: `blue` | `green` | `orange` | `purple` | `pink` | `gray`
+/// - hex: `#rgb` / `#rrggbb` (case-insensitive; output lowercased)
+///
+/// Empty / `none` / `inherit` / `default` / `clear` → `None`.
+/// Unknown values → `None` (treat as clear so bad data cannot stick).
+pub fn normalize_project_color(raw: &str) -> Option<String> {
+    let t = raw.trim();
+    if t.is_empty() {
+        return None;
+    }
+    let lower = t.to_ascii_lowercase();
+    if matches!(
+        lower.as_str(),
+        "none" | "inherit" | "default" | "clear" | "null" | "undefined"
+    ) {
+        return None;
+    }
+    if PROJECT_COLOR_TOKENS.iter().any(|tok| *tok == lower) {
+        return Some(lower);
+    }
+    if let Some(hex) = normalize_hex_color(&lower) {
+        return Some(hex);
+    }
+    None
+}
+
+/// Validate and canonicalize `#rgb` / `#rrggbb` to lowercase hex.
+fn normalize_hex_color(raw: &str) -> Option<String> {
+    let s = raw.trim();
+    if !s.starts_with('#') {
+        return None;
+    }
+    let body = &s[1..];
+    let ok = matches!(body.len(), 3 | 6) && body.bytes().all(|b| b.is_ascii_hexdigit());
+    if !ok {
+        return None;
+    }
+    Some(format!("#{}", body.to_ascii_lowercase()))
+}
+
+/// Set or clear a project sidebar accent color.
+///
+/// `color = None` / empty / `"none"` clears the accent.
+/// Invalid values are rejected (not silently cleared) so the UI can show an error.
+pub fn set_project_color(id: &str, color: Option<String>) -> Result<Project, String> {
+    let next = match color {
+        None => None,
+        Some(raw) => {
+            let t = raw.trim();
+            if t.is_empty()
+                || t.eq_ignore_ascii_case("none")
+                || t.eq_ignore_ascii_case("inherit")
+                || t.eq_ignore_ascii_case("default")
+                || t.eq_ignore_ascii_case("clear")
+            {
+                None
+            } else {
+                Some(
+                    normalize_project_color(t).ok_or_else(|| {
+                        format!(
+                            "invalid project color (use blue|green|orange|purple|pink|gray or #hex): {t}"
+                        )
+                    })?,
+                )
+            }
+        }
+    };
+    let mut list = load_projects();
+    let p = list
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or_else(|| "project not found".to_string())?;
+    p.color = next;
+    let clone = p.clone();
+    save_projects(&list)?;
+    Ok(clone)
+}
+
+pub fn trust_project(id: &str) -> Result<Project, String> {
+    let mut list = load_projects();
+    let p = list
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or_else(|| "project not found".to_string())?;
+    p.trusted = true;
+    p.last_opened_at = Utc::now();
+    let clone = p.clone();
+    save_projects(&list)?;
+    Ok(clone)
+}
+
+/// Set or clear a project-level permission tier (L10).
+///
+/// `policy = None` / empty / `"inherit"` clears the override so the app default
+/// applies. Untrusted projects cannot store a relaxed tier.
+pub fn set_project_permission_policy(id: &str, policy: Option<String>) -> Result<Project, String> {
+    use crate::permission::PermissionPolicy;
+
+    let mut list = load_projects();
+    let p = list
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or_else(|| "project not found".to_string())?;
+    if !p.trusted {
+        return Err("trust this project before setting a permission tier".into());
+    }
+
+    let next = match policy {
+        None => None,
+        Some(raw) => {
+            let t = raw.trim();
+            if t.is_empty()
+                || t.eq_ignore_ascii_case("inherit")
+                || t.eq_ignore_ascii_case("app_default")
+                || t.eq_ignore_ascii_case("default")
+            {
+                None
+            } else {
+                Some(PermissionPolicy::parse(t).as_str().to_string())
+            }
+        }
+    };
+    p.permission_policy = next;
+    let clone = p.clone();
+    save_projects(&list)?;
+    Ok(clone)
+}
+
+/// Known OS sandbox profiles (align with `SandboxSpawnSpec` / frontend helper).
+pub const SANDBOX_PROFILES: &[&str] = &["off", "workspace", "read-only", "strict", "devbox"];
+
+/// Normalize a sandbox profile string. Empty / inherit → `None`.
+/// Unknown values → `None` (caller may fall back to default).
+pub fn normalize_sandbox_profile(raw: &str) -> Option<String> {
+    let t = raw.trim().to_ascii_lowercase();
+    if t.is_empty()
+        || t == "inherit"
+        || t == "app_default"
+        || t == "app-default"
+        || t == "default"
+        || t == "none"
+    {
+        return None;
+    }
+    if SANDBOX_PROFILES.iter().any(|p| *p == t) {
+        Some(t)
+    } else {
+        None
+    }
+}
+
+/// Effective sandbox for spawn: project override (when set) wins over global.
+pub fn resolve_sandbox_profile(global: &str, project_override: Option<&str>) -> String {
+    if let Some(raw) = project_override {
+        if let Some(p) = normalize_sandbox_profile(raw) {
+            return p;
+        }
+    }
+    normalize_sandbox_profile(global).unwrap_or_else(default_sandbox_profile)
+}
+
+/// Set or clear a project-level OS sandbox profile.
+///
+/// `profile = None` / empty / `"inherit"` clears the override so Settings apply.
+/// Requires a trusted project (same gate as permission tier).
+pub fn set_project_sandbox_profile(id: &str, profile: Option<String>) -> Result<Project, String> {
+    let mut list = load_projects();
+    let p = list
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or_else(|| "project not found".to_string())?;
+    if !p.trusted {
+        return Err("trust this project before setting a sandbox profile".into());
+    }
+
+    let next = match profile {
+        None => None,
+        Some(raw) => {
+            let t = raw.trim();
+            if t.is_empty()
+                || t.eq_ignore_ascii_case("inherit")
+                || t.eq_ignore_ascii_case("app_default")
+                || t.eq_ignore_ascii_case("default")
+            {
+                None
+            } else {
+                Some(
+                    normalize_sandbox_profile(t)
+                        .ok_or_else(|| format!("unknown sandbox profile: {t}"))?,
+                )
+            }
+        }
+    };
+    p.sandbox_profile = next;
+    let clone = p.clone();
+    save_projects(&list)?;
+    Ok(clone)
+}
+
+/// Pinned chats keep the order they were pinned (relative file order).
+/// A new pin stays where `set_session_pinned` left it, after older pins.
+/// Unpinned chats are newest `updated_at` first. Pin does not use `updated_at`.
+pub fn sort_sessions_by_pin_then_updated(list: &mut [SessionMeta]) {
+    let pinned: Vec<SessionMeta> = list.iter().filter(|s| s.pinned).cloned().collect();
+    let mut unpinned: Vec<SessionMeta> = list.iter().filter(|s| !s.pinned).cloned().collect();
+    unpinned.sort_by_key(|a| std::cmp::Reverse(a.updated_at));
+    let mut ordered = pinned;
+    ordered.extend(unpinned);
+    list.clone_from_slice(&ordered);
+}
+
+pub fn load_sessions_index() -> Vec<SessionMeta> {
+    let _ = ensure_app_dirs();
+    // Recover from torn/corrupt index (shared CLI+App or crash mid-write).
+    let mut list: Vec<SessionMeta> = read_json_recover(&sessions_index_file());
+    sort_sessions_by_pin_then_updated(&mut list);
+    list
+}
+
+pub fn save_sessions_index(list: &[SessionMeta]) -> Result<(), String> {
+    write_json(&sessions_index_file(), &list)
+}
+
+/// Atomically load, mutate, and persist the sessions index.
+///
+/// The file lock must cover the *entire* read-modify-write transaction.  A
+/// lock around only `save_sessions_index` still allows two App instances to
+/// read the same stale snapshot and overwrite one another's session metadata.
+/// Callers receive their mutation result only after a required replacement
+/// write has completed successfully, so a failed write cannot be mistaken for
+/// a commit. No-op mutations avoid touching the file.
+pub fn update_sessions_index<R>(
+    mutate: impl FnOnce(&mut Vec<SessionMeta>) -> Result<R, String>,
+) -> Result<R, String> {
+    let _ = ensure_app_dirs();
+    let path = sessions_index_file();
+    crate::store_lock::with_exclusive_lock(&path, || {
+        let mut list: Vec<SessionMeta> = read_json_recover(&path);
+        sort_sessions_by_pin_then_updated(&mut list);
+        let before = serde_json::to_vec(&list).map_err(|e| e.to_string())?;
+        let result = mutate(&mut list)?;
+        sort_sessions_by_pin_then_updated(&mut list);
+        let serialized = serde_json::to_string_pretty(&list).map_err(|e| e.to_string())?;
+        // Avoid rewriting the index for no-op migrations (load_projects calls
+        // the legacy rehome check on every read), while still keeping the
+        // comparison inside the transaction boundary.
+        let after = serde_json::to_vec(&list).map_err(|e| e.to_string())?;
+        if before != after {
+            crate::store_lock::write_bytes_replace(&path, serialized.as_bytes())?;
+        }
+        Ok(result)
+    })
+}
+
+/// Update a session row under the index transaction boundary.
+///
+/// This small convenience keeps external callers from accidentally falling
+/// back to `load_sessions_index` + `save_sessions_index` and reintroducing a
+/// stale-snapshot race.
+pub fn update_session_index_row(meta: &SessionMeta) -> Result<SessionMeta, String> {
+    let meta = meta.clone();
+    update_sessions_index(move |list| {
+        if let Some(slot) = list.iter_mut().find(|s| s.id == meta.id) {
+            *slot = meta.clone();
+        } else {
+            list.insert(0, meta.clone());
+        }
+        Ok(meta)
+    })
+}
+
+/// Mutate one session row while holding the sessions-index transaction lock.
+fn update_session_row<R>(
+    id: &str,
+    mutate: impl FnOnce(&mut SessionMeta) -> Result<R, String>,
+) -> Result<R, String> {
+    let id = id.to_string();
+    update_sessions_index(move |list| {
+        let session = list
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or_else(|| "session not found".to_string())?;
+        mutate(session)
+    })
+}
+
+pub fn create_session(
+    project_id: Option<String>,
+    title: Option<String>,
+    scheduled: bool,
+) -> Result<SessionMeta, String> {
+    // Unassigned chats stay orphan (`None`) and appear under Default workspace.
+    // Agent cwd falls back to `{app_data}/workspaces/general` at connect time.
+    let _ = ensure_general_workspace_dir();
+    let project_id = project_id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && s.as_str() != GENERAL_PROJECT_ID);
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now();
+    let meta = SessionMeta {
+        id: id.clone(),
+        project_id,
+        title: title.unwrap_or_else(|| "New chat".into()),
+        agent_session_id: None,
+        created_at: now,
+        updated_at: now,
+        model_id: None,
+        archived: false,
+        pinned: false,
+        effort: None,
+        mode: None,
+        permission_policy: None,
+        json_schema: None,
+        scheduled,
+        worktree_path: None,
+        worktree_branch: None,
+        is_worktree_session: false,
+        plugin_dirs: Vec::new(),
+        extra_rules: None,
+        max_agent_turns: None,
+        system_prompt_override: None,
+        fork_agent_session: false,
+        fork_rewind_prompt_index: None,
+        no_ask_user: None,
+        workspace_id: None,
+        workspace_root_snapshot: None,
+        workspace_capability: None,
+        provider_id: None,
+    };
+    update_sessions_index({
+        let meta = meta.clone();
+        move |list| {
+            list.insert(0, meta);
+            Ok(())
+        }
+    })?;
+    let dir = session_dir(&id);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    write_json(&dir.join("messages.json"), &Vec::<ChatMessageStored>::new())?;
+    Ok(meta)
+}
+
+pub fn update_session_meta(meta: &SessionMeta) -> Result<(), String> {
+    update_session_index_row(meta).map(|_| ())
+}
+
+/// Whole-row replace that keeps `provider_id` and `model_id` from the current
+/// index row. Connect holds a snapshot across the handshake; a composer save
+/// in that window must survive the final write. Other handshake fields
+/// (`agent_session_id`, fork flags, effort, mode) still come from `meta`.
+pub fn update_session_meta_preserving_composer(meta: &SessionMeta) -> Result<SessionMeta, String> {
+    let meta = meta.clone();
+    update_sessions_index(move |list| {
+        let (provider_id, model_id) = list
+            .iter()
+            .find(|s| s.id == meta.id)
+            .map(|s| (s.provider_id.clone(), s.model_id.clone()))
+            .unwrap_or_else(|| (meta.provider_id.clone(), meta.model_id.clone()));
+        let mut writing = meta.clone();
+        writing.provider_id = provider_id;
+        writing.model_id = model_id;
+        if let Some(slot) = list.iter_mut().find(|s| s.id == writing.id) {
+            *slot = writing.clone();
+        } else {
+            list.insert(0, writing.clone());
+        }
+        Ok(writing)
+    })
+}
+
+fn clear_agent_session_id(list: &mut [SessionMeta], id: &str) -> bool {
+    let Some(session) = list.iter_mut().find(|session| session.id == id) else {
+        return false;
+    };
+    if session.agent_session_id.take().is_none() {
+        return false;
+    }
+    session.updated_at = Utc::now();
+    true
+}
+
+/// Force the next CLI connection to create a fresh agent session.
+///
+/// `session/load` restores process-level model/effort from the old CLI journal,
+/// overriding new `--model` / `--reasoning-effort` spawn flags.
+pub fn clear_session_agent_session_id(id: &str) -> Result<bool, String> {
+    let mut list = load_sessions_index();
+    let changed = clear_agent_session_id(&mut list, id);
+    if changed {
+        save_sessions_index(&list)?;
+    }
+    Ok(changed)
+}
+
+pub fn delete_session(id: &str) -> Result<(), String> {
+    let id_for_index = id.to_string();
+    update_sessions_index(move |list| {
+        list.retain(|s| s.id != id_for_index);
+        Ok(())
+    })?;
+    let dir = session_dir(id);
+    let _ = fs::remove_dir_all(dir);
+    Ok(())
+}
+
+pub fn rename_session(id: &str, title: &str) -> Result<SessionMeta, String> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err("title empty".into());
+    }
+    update_session_row(id, move |s| {
+        s.title = title.to_string();
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+pub fn set_session_scheduled(id: &str, scheduled: bool) -> Result<SessionMeta, String> {
+    update_session_row(id, move |s| {
+        s.scheduled = scheduled;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+pub fn set_session_archived(id: &str, archived: bool) -> Result<SessionMeta, String> {
+    update_session_row(id, move |s| {
+        s.archived = archived;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+pub fn set_session_pinned(id: &str, pinned: bool) -> Result<SessionMeta, String> {
+    let id = id.to_string();
+    update_sessions_index(move |list| {
+        let idx = list
+            .iter()
+            .position(|s| s.id == id)
+            .ok_or_else(|| "session not found".to_string())?;
+        list[idx].pinned = pinned;
+        // Do not bump updated_at — pin is organizational (same as project pin).
+        // A new pin appends after pins already in the list so activity cannot
+        // move it, and it does not knock an older pin off.
+        if pinned {
+            let row = list.remove(idx);
+            let at = list.iter().position(|s| !s.pinned).unwrap_or(list.len());
+            list.insert(at, row);
+        }
+        let meta = list
+            .iter()
+            .find(|s| s.id == id)
+            .cloned()
+            .ok_or_else(|| "session not found".to_string())?;
+        Ok(meta)
+    })
+}
+
+/// Drop the CLI session link after a rewind that removed every user prompt.
+/// The next send starts a new agent session. Does not bump `updated_at`.
+pub fn clear_session_agent_link(id: &str) -> Result<SessionMeta, String> {
+    update_session_row(id, |s| {
+        s.agent_session_id = None;
+        s.fork_agent_session = false;
+        Ok(s.clone())
+    })
+}
+
+/// Attach or clear worktree linkage on a session (path/branch/badge flag).
+/// Empty path clears all three fields. Does not bump `updated_at` (organizational).
+pub fn set_session_worktree(
+    id: &str,
+    worktree_path: Option<String>,
+    worktree_branch: Option<String>,
+) -> Result<SessionMeta, String> {
+    let path = worktree_path
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let branch = worktree_branch
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    update_session_row(id, move |s| {
+        if let Some(p) = path {
+            s.worktree_path = Some(p);
+            s.worktree_branch = branch;
+            s.is_worktree_session = true;
+        } else {
+            s.worktree_path = None;
+            s.worktree_branch = None;
+            s.is_worktree_session = false;
+        }
+        Ok(s.clone())
+    })
+}
+
+/// Soft cap aligned with the frontend helper (~256 KiB).
+const JSON_SCHEMA_MAX_CHARS: usize = 256 * 1024;
+
+/// Persist optional structured-output JSON Schema for a session.
+/// Pass `None` or empty string to clear. Host re-parses lightly (object JSON).
+pub fn set_session_json_schema(
+    id: &str,
+    json_schema: Option<String>,
+) -> Result<SessionMeta, String> {
+    let normalized = match json_schema {
+        None => None,
+        Some(raw) => {
+            let t = raw.trim();
+            if t.is_empty() {
+                None
+            } else {
+                if t.len() > JSON_SCHEMA_MAX_CHARS {
+                    return Err("json schema too large".into());
+                }
+                let v: serde_json::Value =
+                    serde_json::from_str(t).map_err(|e| format!("invalid json schema: {e}"))?;
+                if !v.is_object() {
+                    return Err("json schema must be a JSON object".into());
+                }
+                Some(
+                    serde_json::to_string_pretty(&v)
+                        .map_err(|e| format!("invalid json schema: {e}"))?,
+                )
+            }
+        }
+    };
+    update_session_row(id, move |s| {
+        s.json_schema = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// Normalize session plugin dirs: trim, drop empty, dedupe (first wins).
+pub fn normalize_plugin_dirs(dirs: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for d in dirs {
+        let t = d.trim().to_string();
+        if t.is_empty() {
+            continue;
+        }
+        if !seen.insert(t.clone()) {
+            continue;
+        }
+        out.push(t);
+    }
+    out
+}
+
+/// Set session-only `--plugin-dir` paths (empty clears). Does not touch global plugins.
+pub fn set_session_plugin_dirs(id: &str, plugin_dirs: Vec<String>) -> Result<SessionMeta, String> {
+    let dirs = normalize_plugin_dirs(plugin_dirs);
+    update_session_row(id, move |s| {
+        s.plugin_dirs = dirs;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// Soft cap aligned with the frontend helper (~32 KiB).
+const EXTRA_RULES_MAX_CHARS: usize = 32 * 1024;
+
+/// Soft cap for system prompt override (~32 KiB), aligned with the frontend helper.
+const SYSTEM_PROMPT_OVERRIDE_MAX_CHARS: usize = 32 * 1024;
+
+/// Trim + clamp session extra rules. Empty after trim → `None` (clear).
+pub fn sanitize_extra_rules(raw: Option<String>) -> Option<String> {
+    match raw {
+        None => None,
+        Some(s) => {
+            let t = s.trim();
+            if t.is_empty() {
+                None
+            } else if t.len() > EXTRA_RULES_MAX_CHARS {
+                Some(t.chars().take(EXTRA_RULES_MAX_CHARS).collect())
+            } else {
+                Some(t.to_string())
+            }
+        }
+    }
+}
+
+/// Trim, strip NUL bytes, and clamp session system prompt override.
+/// Empty after sanitize → `None` (clear). Never log the returned value.
+pub fn sanitize_system_prompt_override(raw: Option<String>) -> Option<String> {
+    match raw {
+        None => None,
+        Some(s) => {
+            // Strip NULs so the value cannot break argv / TOML / log lines.
+            let cleaned: String = s.chars().filter(|c| *c != '\0').collect();
+            let t = cleaned.trim();
+            if t.is_empty() {
+                None
+            } else if t.chars().count() > SYSTEM_PROMPT_OVERRIDE_MAX_CHARS {
+                Some(t.chars().take(SYSTEM_PROMPT_OVERRIDE_MAX_CHARS).collect())
+            } else {
+                Some(t.to_string())
+            }
+        }
+    }
+}
+
+/// Set or clear per-session extra rules (`grok --rules` on next spawn).
+/// Pass `None` or empty/whitespace to clear.
+pub fn set_session_extra_rules(
+    id: &str,
+    extra_rules: Option<String>,
+) -> Result<SessionMeta, String> {
+    let normalized = sanitize_extra_rules(extra_rules);
+    update_session_row(id, move |s| {
+        s.extra_rules = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// Set or clear per-session max agent turns (`grok --max-turns` on next spawn).
+///
+/// Pass `None` or `0` to clear (inherit global settings). Values are clamped to 1–200
+/// via [`crate::acp_client::normalize_max_agent_turns`].
+pub fn set_session_max_agent_turns(
+    id: &str,
+    max_agent_turns: Option<u32>,
+) -> Result<SessionMeta, String> {
+    let normalized = crate::acp_client::normalize_max_agent_turns(max_agent_turns);
+    update_session_row(id, move |s| {
+        s.max_agent_turns = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// Set or clear per-session system prompt override
+/// (`grok --system-prompt-override` on next spawn).
+/// Pass `None` or empty/whitespace to clear. Soft-respawn is handled by the command.
+/// Set or clear per-session `--no-ask-user` override.
+/// `None` inherits global `AppSettings.no_ask_user`.
+pub fn set_session_no_ask_user(id: &str, no_ask_user: Option<bool>) -> Result<SessionMeta, String> {
+    update_session_row(id, move |s| {
+        s.no_ask_user = no_ask_user;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// Bind or clear a multi-root workspace on a session (#1194).
+pub fn set_session_workspace(
+    id: &str,
+    workspace_id: Option<String>,
+    workspace_root_snapshot: Option<String>,
+    workspace_capability: Option<String>,
+) -> Result<SessionMeta, String> {
+    update_session_row(id, move |s| {
+        s.workspace_id = workspace_id;
+        s.workspace_root_snapshot = workspace_root_snapshot;
+        s.workspace_capability = workspace_capability;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+pub fn set_session_system_prompt_override(
+    id: &str,
+    system_prompt_override: Option<String>,
+) -> Result<SessionMeta, String> {
+    let normalized = sanitize_system_prompt_override(system_prompt_override);
+    update_session_row(id, move |s| {
+        s.system_prompt_override = normalized;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// Bind (or clear) a session's project folder. Used to attach orphan / legacy
+/// chats to a project added later. Clearing (`None`) returns the chat to
+/// Default workspace; agent cwd still uses the general workspace directory.
+///
+/// Internal / fork-restore path: does **not** clear `agent_session_id` or
+/// worktree meta. User-facing sidebar/chip moves must use
+/// [`move_session_to_project`].
+pub fn set_session_project(id: &str, project_id: Option<String>) -> Result<SessionMeta, String> {
+    let pid = normalize_move_project_id(project_id);
+    if let Some(ref pid) = pid {
+        let projects = load_projects();
+        if !projects.iter().any(|x| x.id.as_str() == pid.as_str()) {
+            return Err(format!("project not found: {pid}"));
+        }
+    } else {
+        let _ = ensure_general_workspace_dir();
+    }
+    apply_session_project(id, pid, false)
+}
+
+fn normalize_move_project_id(project_id: Option<String>) -> Option<String> {
+    project_id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && s.as_str() != GENERAL_PROJECT_ID)
+}
+
+/// Refuse a user-facing move target that is missing, untrusted, or whose
+/// folder is gone. Orphan (`None`) ensures the general workspace dir exists.
+fn validate_move_target(pid: &Option<String>) -> Result<(), String> {
+    if let Some(pid) = pid {
+        let projects = load_projects();
+        let Some(proj) = projects.iter().find(|x| x.id.as_str() == pid.as_str()) else {
+            return Err(format!("session_move_not_found: {pid}"));
+        };
+        if !proj.trusted {
+            return Err("session_move_untrusted".into());
+        }
+        if !proj.path_ok && !proj.is_ssh_remote() {
+            return Err("session_move_path_missing".into());
+        }
+    } else {
+        let _ = ensure_general_workspace_dir();
+    }
+    Ok(())
+}
+
+/// No-write pre-flight for a user-facing move.
+///
+/// The Host command must call this **before** killing the session's agent:
+/// a refused target (untrusted / missing / unknown) or a same-project no-op
+/// must not cost the chat its live ACP process and `agent_session_id`.
+#[derive(Debug)]
+pub struct SessionMovePrecheck {
+    pub cwd_changes: bool,
+}
+
+pub fn precheck_session_move(
+    id: &str,
+    project_id: Option<String>,
+) -> Result<SessionMovePrecheck, String> {
+    let pid = normalize_move_project_id(project_id);
+    validate_move_target(&pid)?;
+    let current = load_sessions_index()
+        .into_iter()
+        .find(|s| s.id == id)
+        .ok_or_else(|| format!("session not found: {id}"))?;
+    Ok(SessionMovePrecheck {
+        cwd_changes: current.project_id.as_deref() != pid.as_deref(),
+    })
+}
+
+/// User-facing move: rebind cwd and drop the previous agent / worktree identity.
+/// Refuses untrusted or missing target folders. Same-project is a no-op.
+pub fn move_session_to_project(
+    id: &str,
+    project_id: Option<String>,
+) -> Result<SessionMeta, String> {
+    let pid = normalize_move_project_id(project_id);
+    validate_move_target(&pid)?;
+    apply_session_project(id, pid, true)
+}
+
+fn apply_session_project(
+    id: &str,
+    pid: Option<String>,
+    reset_agent_identity: bool,
+) -> Result<SessionMeta, String> {
+    update_session_row(id, move |s| {
+        let cwd_changes = s.project_id.as_deref() != pid.as_deref();
+        if !cwd_changes {
+            return Ok(s.clone());
+        }
+        s.project_id = pid;
+        if reset_agent_identity {
+            s.agent_session_id = None;
+            s.fork_agent_session = false;
+            s.worktree_path = None;
+            s.worktree_branch = None;
+            s.is_worktree_session = false;
+        }
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// Archive every non-archived session under a project.
+pub fn archive_project_sessions(project_id: &str) -> Result<usize, String> {
+    let project_id = project_id.to_string();
+    update_sessions_index(move |list| {
+        let mut n = 0usize;
+        for s in list.iter_mut() {
+            if s.project_id.as_deref() == Some(project_id.as_str()) && !s.archived {
+                s.archived = true;
+                s.updated_at = Utc::now();
+                n += 1;
+            }
+        }
+        Ok(n)
+    })
+}
+
+pub fn load_messages(session_id: &str) -> Vec<ChatMessageStored> {
+    read_json_recover(&session_dir(session_id).join("messages.json"))
+}
+
+fn write_messages_locked(path: &Path, messages: &[ChatMessageStored]) -> Result<(), String> {
+    // Compact JSON: mid-stream flushes rewrite the whole journal. Pretty
+    // indent made long chats a disk sink. `from_str` still accepts pretty files.
+    let serialized = serde_json::to_string(messages).map_err(|e| e.to_string())?;
+    crate::store_lock::write_bytes_replace(path, serialized.as_bytes())
+}
+
+/// Merge an incoming message snapshot with the latest on-disk journal.
+///
+/// Stream/tool writers use per-message ids and may append while a stale
+/// snapshot is being prepared.  Keep rows that are absent from the incoming
+/// snapshot, and for duplicate ids prefer the row with the newer
+/// `created_at` revision.  New rows are inserted relative to their nearest
+/// incoming neighbours so reconciliation does not scramble transcript order.
+fn merge_message_snapshots(
+    existing: &[ChatMessageStored],
+    incoming: &[ChatMessageStored],
+) -> Vec<ChatMessageStored> {
+    use std::collections::{HashMap, HashSet};
+
+    let mut merged = existing.to_vec();
+    let mut positions: HashMap<String, usize> = merged
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.id.clone(), i))
+        .collect();
+
+    // Apply updates to rows that were already present.  A stale full snapshot
+    // must not roll a newer stream row back to an older body.
+    for message in incoming {
+        if let Some(&index) = positions.get(&message.id) {
+            if message.created_at >= merged[index].created_at {
+                merged[index] = message.clone();
+            }
+        }
+    }
+
+    let incoming_ids: HashSet<&str> = incoming.iter().map(|m| m.id.as_str()).collect();
+    for (incoming_index, message) in incoming.iter().enumerate() {
+        if positions.contains_key(&message.id) {
+            continue;
+        }
+
+        // Prefer an existing/injected predecessor, otherwise insert before the
+        // next known incoming row.  This preserves the order of a reconcile
+        // snapshot while retaining concurrent rows not present in it.
+        let predecessor = incoming[..incoming_index]
+            .iter()
+            .rev()
+            .find_map(|candidate| positions.get(&candidate.id).copied());
+        let successor = incoming[incoming_index + 1..]
+            .iter()
+            .find_map(|candidate| positions.get(&candidate.id).copied());
+        let at = if let Some(index) = predecessor {
+            index + 1
+        } else if let Some(index) = successor {
+            index
+        } else {
+            merged.len()
+        };
+        merged.insert(at, message.clone());
+        // Insertion shifts positions at/after `at`.
+        for index in positions.values_mut() {
+            if *index >= at {
+                *index += 1;
+            }
+        }
+        positions.insert(message.id.clone(), at);
+    }
+
+    // Silence an otherwise easy-to-miss accidental duplicate in malformed
+    // input without dropping the latest row from the normal path.
+    if incoming_ids.len() < incoming.len() {
+        let mut seen = HashSet::new();
+        merged.retain(|m| seen.insert(m.id.clone()));
+    }
+    merged
+}
+
+/// Save a journal snapshot without clobbering rows appended concurrently.
+///
+/// This is the default for journal reconciliation and enrichment.  Call
+/// [`replace_messages`] for an intentional destructive operation such as
+/// rewind/truncate.
+pub fn save_messages(session_id: &str, messages: &[ChatMessageStored]) -> Result<(), String> {
+    let path = session_dir(session_id).join("messages.json");
+    crate::store_lock::with_exclusive_lock(&path, || {
+        let existing: Vec<ChatMessageStored> = read_json_recover(&path);
+        let merged = merge_message_snapshots(&existing, messages);
+        write_messages_locked(&path, &merged)
+    })
+}
+
+/// Intentionally replace a session journal under the same lock used by stream
+/// appends.  This is the only API that removes rows from an existing journal.
+pub fn replace_messages(session_id: &str, messages: &[ChatMessageStored]) -> Result<(), String> {
+    let path = session_dir(session_id).join("messages.json");
+    crate::store_lock::with_exclusive_lock(&path, || write_messages_locked(&path, messages))
+}
+
+pub fn append_message(session_id: &str, msg: ChatMessageStored) -> Result<(), String> {
+    let path = session_dir(session_id).join("messages.json");
+    crate::store_lock::with_exclusive_lock(&path, || {
+        let mut msgs: Vec<ChatMessageStored> = read_json_recover(&path);
+        if let Some(slot) = msgs.iter_mut().find(|m| m.id == msg.id) {
+            // `created_at` doubles as a lightweight per-row revision.  A
+            // stale append from a delayed task must not roll back newer stream
+            // text; equal timestamps are treated as an intentional update.
+            if msg.created_at >= slot.created_at {
+                *slot = msg;
+            }
+        } else {
+            msgs.push(msg);
+        }
+        write_messages_locked(&path, &msgs)
+    })
+}
+
+/// True for a normal user prompt turn. Mid-turn interjections belong to the
+/// surrounding turn and are excluded from rewind prompt indexes.
+pub fn is_user_prompt_message(message: &ChatMessageStored) -> bool {
+    message.role == "user" && message.marker.as_deref() != Some("interjection")
+}
+
+/// End index (exclusive) of the full turn for `user_prompt_index` (0-based).
+/// Turn = that user message + following non-user rows until the next *prompt* user.
+pub fn end_index_through_user_prompt(
+    messages: &[ChatMessageStored],
+    user_prompt_index: u32,
+) -> Option<usize> {
+    let mut user_i = 0u32;
+    for (i, m) in messages.iter().enumerate() {
+        if !is_user_prompt_message(m) {
+            continue;
+        }
+        if user_i == user_prompt_index {
+            let mut j = i + 1;
+            while j < messages.len() && !is_user_prompt_message(&messages[j]) {
+                j += 1;
+            }
+            return Some(j);
+        }
+        user_i = user_i.saturating_add(1);
+    }
+    None
+}
+
+/// Keep messages through the end of the selected user turn (ACP `/rewind` semantics).
+pub fn truncate_through_user_prompt(
+    messages: &[ChatMessageStored],
+    user_prompt_index: u32,
+) -> Result<Vec<ChatMessageStored>, String> {
+    let end = end_index_through_user_prompt(messages, user_prompt_index)
+        .ok_or_else(|| format!("user prompt index out of range: {user_prompt_index}"))?;
+    Ok(messages[..end].to_vec())
+}
+
+/// Re-cut a child journal to `through_user_prompt_index` if it grew past the cut.
+///
+/// Partial-fork children can be inflated back to the parent transcript (for
+/// example by a linked reconcile). After a failed child rewind, call this
+/// before `session/new` / history bootstrap so the new agent cannot ingest the
+/// untrimmed copy. Read, truncate, and optional persist share the messages-path
+/// exclusive lock so a concurrent append cannot sneak in and then be dropped.
+/// Persists only when the stored journal is longer than the intended cut.
+///
+/// Returns `(before_len, after_len, persisted)`.
+pub fn retruncate_child_journal_to_cut(
+    session_id: &str,
+    through_user_prompt_index: u32,
+) -> Result<(usize, usize, bool), String> {
+    let path = session_dir(session_id).join("messages.json");
+    crate::store_lock::with_exclusive_lock(&path, || {
+        let msgs: Vec<ChatMessageStored> = read_json_recover(&path);
+        let before_len = msgs.len();
+        let truncated = truncate_through_user_prompt(&msgs, through_user_prompt_index)?;
+        let after_len = truncated.len();
+        if after_len < before_len {
+            write_messages_locked(&path, &truncated)?;
+            Ok((before_len, after_len, true))
+        } else {
+            Ok((before_len, after_len, false))
+        }
+    })
+}
+
+/// Count real user prompts (excludes mid-turn `interjection` markers).
+pub fn user_prompt_count(messages: &[ChatMessageStored]) -> u32 {
+    messages
+        .iter()
+        .filter(|m| is_user_prompt_message(m))
+        .count() as u32
+}
+
+/// ACP `targetPromptIndex` that keeps every prompt except the last one.
+///
+/// TUI `/rewind` keeps the selected turn and drops after it. Drop-last therefore
+/// targets the previous prompt when `count > 1`, or `0` when editing the only
+/// prompt. `None` when there is nothing to rewind.
+pub fn drop_last_user_prompt_exec_index(user_prompt_count: u32) -> Option<u32> {
+    match user_prompt_count {
+        0 => None,
+        1 => Some(0),
+        n => Some(n - 2),
+    }
+}
+
+/// Parse CLI `user prompt index out of range: X (have N)`.
+pub fn parse_agent_prompt_count_from_rewind_error(err: &str) -> Option<u32> {
+    const MARK: &str = "(have ";
+    let rest = err.split(MARK).nth(1)?;
+    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+    if digits.is_empty() {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+/// Map a Host journal user-prompt index onto the live agent session.
+///
+/// After restart, Host still lists old bubbles while the new agent session only
+/// has prompts sent since reconnect (history bootstrap is prepended onto the
+/// first of those). Host turns before that window exist only inside the blob.
+pub fn map_host_rewind_index_to_agent(
+    host_index: u32,
+    host_user_turns: u32,
+    agent_user_turns: u32,
+) -> Option<u32> {
+    if agent_user_turns == 0 {
+        return None;
+    }
+    if host_user_turns <= agent_user_turns {
+        return (host_index < agent_user_turns).then_some(host_index);
+    }
+    let first_live = host_user_turns - agent_user_turns;
+    if host_index < first_live {
+        return None;
+    }
+    Some(host_index - first_live)
+}
+
+/// Exclusive cut index: keep messages strictly before the last real user prompt.
+pub fn cut_index_before_last_user_prompt(messages: &[ChatMessageStored]) -> usize {
+    messages
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, m)| is_user_prompt_message(m))
+        .map(|(i, _)| i)
+        .unwrap_or(messages.len())
+}
+
+/// Drop-last may truncate the Host journal only when agent rewind was skipped
+/// (mock / disconnected) or succeeded. A failed live RPC must leave the journal
+/// untouched — otherwise UI edit-resend can destroy turns the agent never dropped.
+pub fn drop_last_should_truncate_journal(agent_rewind_ok: Option<bool>) -> bool {
+    !matches!(agent_rewind_ok, Some(false))
+}
+
+/// Fork a session: new journal + meta, same project.
+///
+/// By default the fork has **no** `agent_session_id` (next connect uses `session/new`
+/// and journal bootstrap). When `fork_agent_session` is true and the source has an
+/// agent id, the fork carries that id with `fork_agent_session=true` so the next
+/// connect uses CLI `--fork-session` semantics (ACP `session/fork` produces a new
+/// agent id with full parent context; the source agent session is left untouched).
+///
+/// `through_user_prompt_index`: when set, copy only through that user turn (inclusive).
+pub fn fork_session(
+    source_id: &str,
+    through_user_prompt_index: Option<u32>,
+    title: Option<String>,
+    fork_agent_session: bool,
+) -> Result<SessionMeta, String> {
+    let list = load_sessions_index();
+    let source = list
+        .iter()
+        .find(|s| s.id == source_id)
+        .ok_or_else(|| format!("session not found: {source_id}"))?
+        .clone();
+
+    let mut msgs = load_messages(source_id);
+    if let Some(idx) = through_user_prompt_index {
+        msgs = truncate_through_user_prompt(&msgs, idx)?;
+    }
+
+    let fork_title = title
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            let base = source.title.trim();
+            let base = if base.is_empty() { "chat" } else { base };
+            if base.to_ascii_lowercase().starts_with("fork of ") {
+                base.to_string()
+            } else {
+                format!("Fork of {base}")
+            }
+        });
+
+    let mut meta = create_session(source.project_id.clone(), Some(fork_title), false)?;
+    // Inherit composer prefs from source so the fork feels continuous.
+    meta.model_id = source.model_id.clone();
+    meta.effort = source.effort.clone();
+    meta.mode = source.mode.clone();
+    meta.permission_policy = source.permission_policy.clone();
+    // Worktree linkage follows the source project/cwd story.
+    meta.worktree_path = source.worktree_path.clone();
+    meta.worktree_branch = source.worktree_branch.clone();
+    meta.is_worktree_session = source.is_worktree_session;
+    meta.plugin_dirs = source.plugin_dirs.clone();
+    meta.extra_rules = source.extra_rules.clone();
+    meta.max_agent_turns = source.max_agent_turns;
+    meta.system_prompt_override = source.system_prompt_override.clone();
+    meta.no_ask_user = source.no_ask_user;
+    meta.workspace_id = source.workspace_id.clone();
+    meta.workspace_root_snapshot = source.workspace_root_snapshot.clone();
+    meta.workspace_capability = source.workspace_capability.clone();
+    // CLI --fork-session: resume parent agent context under a new agent id.
+    let source_agent = source
+        .agent_session_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    if fork_agent_session {
+        if let Some(aid) = source_agent {
+            meta.agent_session_id = Some(aid);
+            meta.fork_agent_session = true;
+            meta.fork_rewind_prompt_index = through_user_prompt_index;
+        }
+    }
+    meta.updated_at = Utc::now();
+    update_session_meta(&meta)?;
+
+    // Remap ids so the fork is independent of the source journal ids.
+    let prefix = format!("fork-{}", &meta.id[..meta.id.len().min(8)]);
+    let forked: Vec<ChatMessageStored> = msgs
+        .into_iter()
+        .enumerate()
+        .map(|(i, mut m)| {
+            m.id = format!("{prefix}-{i}");
+            m
+        })
+        .collect();
+    save_messages(&meta.id, &forked)?;
+    Ok(meta)
+}
+
+/// Set or clear the one-shot CLI `--fork-session` flag on a session.
+///
+/// When `true`, next connect forks `agent_session_id` into a new agent id.
+/// Requires a non-empty `agent_session_id` to enable; otherwise stores `false`.
+pub fn set_session_fork_agent_session(
+    id: &str,
+    fork_agent_session: bool,
+) -> Result<SessionMeta, String> {
+    update_session_row(id, move |s| {
+        let has_agent = s
+            .agent_session_id
+            .as_deref()
+            .is_some_and(|a| !a.trim().is_empty());
+        s.fork_agent_session = fork_agent_session && has_agent;
+        if !s.fork_agent_session {
+            s.fork_rewind_prompt_index = None;
+        }
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+/// After a failed connect, drop the one-shot fork flags.
+///
+/// Partial forks (those with a rewind index) also drop `agent_session_id` so
+/// the next connect cannot resume the parent's agent id after a failed
+/// agent-side fork attempt. Full forks keep the parent agent id.
+pub fn clear_session_fork_after_connect_failure(id: &str) -> Result<SessionMeta, String> {
+    update_session_row(id, |s| {
+        let pending_partial = s.fork_agent_session && s.fork_rewind_prompt_index.is_some();
+        if pending_partial {
+            s.agent_session_id = None;
+        }
+        s.fork_agent_session = false;
+        s.fork_rewind_prompt_index = None;
+        s.updated_at = Utc::now();
+        Ok(s.clone())
+    })
+}
+
+// ─── Automations (scheduled tasks shell) ───────────────────────────────────
+
+/// Host-side scheduled automation. Execution is driven by the host scheduler
+/// (`automation_runner`) while the process is alive (including tray-hidden UI);
+/// this store is the source of truth for the list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Automation {
+    pub id: String,
+    pub title: String,
+    /// Natural-language prompt / instructions for the agent when the task runs.
+    pub prompt: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    pub project_id: Option<String>,
+    pub model_id: Option<String>,
+    pub effort: Option<String>,
+    /// `daily` | `weekly` | `weekdays` | `once`
+    #[serde(default = "default_frequency")]
+    pub frequency: String,
+    /// Local wall-clock time `HH:MM` (24h).
+    #[serde(default = "default_time")]
+    pub time: String,
+    /// For `weekly`: 0=Sun … 6=Sat (JS Date convention).
+    #[serde(default)]
+    pub weekdays: Vec<u8>,
+    /// `all` | `failures` | `none`
+    #[serde(default = "default_notify")]
+    pub notify: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_run_at: Option<DateTime<Utc>>,
+    pub next_run_at: Option<DateTime<Utc>>,
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_frequency() -> String {
+    "daily".into()
+}
+fn default_time() -> String {
+    "09:00".into()
+}
+fn default_notify() -> String {
+    "all".into()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationInput {
+    pub title: String,
+    pub prompt: String,
+    pub enabled: Option<bool>,
+    pub project_id: Option<String>,
+    pub model_id: Option<String>,
+    pub effort: Option<String>,
+    pub frequency: Option<String>,
+    pub time: Option<String>,
+    pub weekdays: Option<Vec<u8>>,
+    pub notify: Option<String>,
+    pub next_run_at: Option<DateTime<Utc>>,
+}
+
+pub fn load_automations() -> Vec<Automation> {
+    let _ = ensure_app_dirs();
+    let mut list: Vec<Automation> = read_json(&automations_file());
+    list.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
+    list
+}
+
+pub fn save_automations(list: &[Automation]) -> Result<(), String> {
+    let _ = ensure_app_dirs();
+    write_json(&automations_file(), &list)
+}
+
+pub fn create_automation(input: AutomationInput) -> Result<Automation, String> {
+    let title = input.title.trim().to_string();
+    if title.is_empty() {
+        return Err("title empty".into());
+    }
+    let prompt = input.prompt.trim().to_string();
+    if prompt.is_empty() {
+        return Err("prompt empty".into());
+    }
+    let now = Utc::now();
+    let auto = Automation {
+        id: Uuid::new_v4().to_string(),
+        title,
+        prompt,
+        enabled: input.enabled.unwrap_or(true),
+        project_id: input.project_id,
+        model_id: input.model_id,
+        effort: input.effort,
+        frequency: input
+            .frequency
+            .unwrap_or_else(default_frequency)
+            .trim()
+            .to_string(),
+        time: input.time.unwrap_or_else(default_time).trim().to_string(),
+        weekdays: input.weekdays.unwrap_or_default(),
+        notify: input
+            .notify
+            .unwrap_or_else(default_notify)
+            .trim()
+            .to_string(),
+        created_at: now,
+        updated_at: now,
+        last_run_at: None,
+        next_run_at: input.next_run_at,
+    };
+    let mut list = load_automations();
+    list.insert(0, auto.clone());
+    save_automations(&list)?;
+    Ok(auto)
+}
+
+pub fn update_automation(id: &str, input: AutomationInput) -> Result<Automation, String> {
+    let mut list = load_automations();
+    let auto = list
+        .iter_mut()
+        .find(|a| a.id == id)
+        .ok_or_else(|| "automation not found".to_string())?;
+    let title = input.title.trim();
+    if title.is_empty() {
+        return Err("title empty".into());
+    }
+    let prompt = input.prompt.trim();
+    if prompt.is_empty() {
+        return Err("prompt empty".into());
+    }
+    auto.title = title.to_string();
+    auto.prompt = prompt.to_string();
+    if let Some(e) = input.enabled {
+        auto.enabled = e;
+    }
+    auto.project_id = input.project_id;
+    auto.model_id = input.model_id;
+    auto.effort = input.effort;
+    if let Some(f) = input.frequency {
+        auto.frequency = f.trim().to_string();
+    }
+    if let Some(t) = input.time {
+        auto.time = t.trim().to_string();
+    }
+    if let Some(w) = input.weekdays {
+        auto.weekdays = w;
+    }
+    if let Some(n) = input.notify {
+        auto.notify = n.trim().to_string();
+    }
+    if input.next_run_at.is_some() {
+        auto.next_run_at = input.next_run_at;
+    }
+    auto.updated_at = Utc::now();
+    let clone = auto.clone();
+    save_automations(&list)?;
+    Ok(clone)
+}
+
+pub fn set_automation_enabled(id: &str, enabled: bool) -> Result<Automation, String> {
+    let mut list = load_automations();
+    let auto = list
+        .iter_mut()
+        .find(|a| a.id == id)
+        .ok_or_else(|| "automation not found".to_string())?;
+    auto.enabled = enabled;
+    auto.updated_at = Utc::now();
+    let clone = auto.clone();
+    save_automations(&list)?;
+    Ok(clone)
+}
+
+pub fn mark_automation_run(
+    id: &str,
+    last_run_at: DateTime<Utc>,
+    next_run_at: Option<DateTime<Utc>>,
+) -> Result<Automation, String> {
+    let mut list = load_automations();
+    let auto = list
+        .iter_mut()
+        .find(|a| a.id == id)
+        .ok_or_else(|| "automation not found".to_string())?;
+    auto.last_run_at = Some(last_run_at);
+    auto.next_run_at = next_run_at;
+    auto.updated_at = Utc::now();
+    let clone = auto.clone();
+    save_automations(&list)?;
+    Ok(clone)
+}
+
+pub fn delete_automation(id: &str) -> Result<(), String> {
+    let mut list = load_automations();
+    let before = list.len();
+    list.retain(|a| a.id != id);
+    if list.len() == before {
+        return Err("automation not found".into());
+    }
+    save_automations(&list)
+}
+
+/// Load app secrets (API keys). Backend-agnostic: OS keychain preferred, file fallback.
+/// See [`crate::secrets`] for migration and storage details. Callers must not log values.
+pub fn load_secrets() -> SecretsFile {
+    crate::secrets::load_secrets()
+}
+
+/// Persist app secrets. Prefer OS keychain for API keys; metadata may remain in secrets.json.
+pub fn save_secrets(s: &SecretsFile) -> Result<(), String> {
+    crate::secrets::save_secrets(s)
+}
+
+fn collect_agent_home_api_keys() -> Vec<String> {
+    let home = crate::paths::resolve_agent_grok_home(&load_settings().session_data_mode);
+    let path = home.join("config.toml");
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        let Some(rest) = t
+            .strip_prefix("api_key")
+            .or_else(|| t.strip_prefix("\"api_key\""))
+        else {
+            continue;
+        };
+        let rest = rest.trim().trim_start_matches('=').trim();
+        let val = rest.trim_matches('"').trim_matches('\'').trim();
+        if val.len() >= 8 {
+            out.push(val.to_string());
+        }
+    }
+    out
+}
+
+/// Redact secrets from a string for logs/Doctor export.
+pub fn redact_text(input: &str) -> String {
+    let mut out = input.to_string();
+    let secrets = load_secrets();
+    let mut keys: Vec<String> = [
+        secrets.official_api_key.clone(),
+        secrets.relay_api_key.clone(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    keys.extend(collect_agent_home_api_keys());
+    for key in keys {
+        if key.len() >= 8 {
+            out = out.replace(&key, "[REDACTED]");
+        }
+    }
+    // common token scrubbing without regex crate
+    let mut cleaned = String::with_capacity(out.len());
+    for word in out.split_whitespace() {
+        if word.len() > 20
+            && (word.starts_with("sk-") || word.starts_with("xai-") || word.contains("Bearer"))
+        {
+            cleaned.push_str("[REDACTED]");
+        } else {
+            cleaned.push_str(word);
+        }
+        cleaned.push(' ');
+    }
+    cleaned
+}
+
+fn global_prefs(settings: &AppSettings) -> (String, String, String, String) {
+    (
+        settings
+            .model_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_OFFICIAL_MODEL_ID.into()),
+        settings
+            .effort
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "xhigh".into()),
+        if settings.mode.trim().is_empty() {
+            "agent".into()
+        } else {
+            // Heal a `plan` default already written by an older build: plan mode
+            // must never be inherited by a new session.
+            non_plan_mode(&settings.mode)
+        },
+        if settings.permission_policy.trim().is_empty() {
+            "ask".into()
+        } else {
+            settings.permission_policy.clone()
+        },
+    )
+}
+
+/// Resolve effective composer prefs for the active project/session + configured scope.
+///
+/// Model / mode follow `composer_prefs_scope`.
+/// Permission and effort always cascade session → project → global (L10), and
+/// untrusted projects force Ask regardless of stored tiers.
+pub fn resolve_composer_prefs(project_id: Option<&str>, session_id: Option<&str>) -> ComposerPrefs {
+    use crate::permission::effective_permission_policy;
+
+    let settings = load_settings();
+    let scope = ComposerPrefsScope::parse(&settings.composer_prefs_scope);
+    let (g_model, g_effort, g_mode, g_policy) = global_prefs(&settings);
+
+    let sess = session_id.and_then(|id| load_sessions_index().into_iter().find(|s| s.id == id));
+    // A chat that already chose a model keeps it across restart, whatever the
+    // memory scope says. Chats that never chose one still follow the scope.
+    let session_model = sess
+        .as_ref()
+        .and_then(|s| s.model_id.clone())
+        .filter(|x| !x.trim().is_empty());
+    let session_provider = sess
+        .as_ref()
+        .and_then(|s| s.provider_id.clone())
+        .filter(|x| !x.trim().is_empty());
+    let proj = sess
+        .as_ref()
+        .and_then(|s| s.project_id.as_deref())
+        .or(project_id)
+        .and_then(|id| load_projects().into_iter().find(|p| p.id == id));
+
+    // Permission: always cascade (independent of model memory scope).
+    let permission_policy = effective_permission_policy(
+        &g_policy,
+        proj.as_ref().map(|p| p.trusted),
+        proj.as_ref().and_then(|p| p.permission_policy.as_deref()),
+        sess.as_ref().and_then(|s| s.permission_policy.as_deref()),
+    )
+    .as_str()
+    .to_string();
+
+    // Effort: always cascade session → project → global, like permission and
+    // unlike model. Reasoning effort is a per-chat decision — under the default
+    // global scope a single `settings.effort` served every chat, so raising
+    // effort in a new chat silently rewrote every older chat on that model.
+    // `settings.effort` now only seeds chats that never chose one.
+    let effort = sess
+        .as_ref()
+        .and_then(|s| s.effort.clone())
+        .filter(|x| !x.trim().is_empty())
+        .or_else(|| {
+            proj.as_ref()
+                .and_then(|p| p.effort.clone())
+                .filter(|x| !x.trim().is_empty())
+        })
+        .unwrap_or(g_effort);
+
+    let mut prefs = match scope {
+        ComposerPrefsScope::Global => ComposerPrefs {
+            model_id: g_model,
+            effort,
+            mode: g_mode,
+            permission_policy,
+            scope: scope.as_str().into(),
+            source: "global".into(),
+            provider_id: None,
+        },
+        ComposerPrefsScope::Project => {
+            if let Some(p) = proj {
+                ComposerPrefs {
+                    model_id: p.model_id.filter(|s| !s.is_empty()).unwrap_or(g_model),
+                    effort,
+                    mode: p
+                        .mode
+                        .filter(|s| !s.is_empty())
+                        // Project defaults never carry plan mode (heals old data).
+                        .map(|m| non_plan_mode(&m))
+                        .unwrap_or(g_mode),
+                    permission_policy,
+                    scope: scope.as_str().into(),
+                    source: "project".into(),
+                    provider_id: None,
+                }
+            } else {
+                ComposerPrefs {
+                    model_id: g_model,
+                    effort,
+                    mode: g_mode,
+                    permission_policy,
+                    scope: scope.as_str().into(),
+                    source: "global".into(),
+                    provider_id: None,
+                }
+            }
+        }
+        ComposerPrefsScope::Session => {
+            let p_model = proj
+                .as_ref()
+                .and_then(|p| p.model_id.clone())
+                .filter(|s| !s.is_empty())
+                .unwrap_or(g_model.clone());
+            let p_mode = proj
+                .as_ref()
+                .and_then(|p| p.mode.clone())
+                .filter(|s| !s.is_empty())
+                // A project default of `plan` is never inherited (heals old data).
+                .map(|m| non_plan_mode(&m))
+                .unwrap_or(g_mode.clone());
+
+            if let Some(s) = sess {
+                ComposerPrefs {
+                    model_id: s.model_id.filter(|x| !x.is_empty()).unwrap_or(p_model),
+                    effort,
+                    mode: s.mode.filter(|x| !x.is_empty()).unwrap_or(p_mode),
+                    permission_policy,
+                    scope: scope.as_str().into(),
+                    source: "session".into(),
+                    provider_id: None,
+                }
+            } else {
+                ComposerPrefs {
+                    model_id: p_model,
+                    effort,
+                    mode: p_mode,
+                    permission_policy,
+                    scope: scope.as_str().into(),
+                    source: if proj.is_some() { "project" } else { "global" }.into(),
+                    provider_id: None,
+                }
+            }
+        }
+    };
+    if let Some(m) = session_model {
+        prefs.model_id = m;
+    }
+    prefs.provider_id = session_provider;
+    prefs.effort = clamp_effort_for_model(&prefs.model_id, &prefs.effort);
+    prefs
+}
+
+/// Plan mode is a **transient, per-session** state, never a sticky default.
+///
+/// It used to be persisted like any other mode, so a single `/plan` wrote
+/// `mode: "plan"` into global settings and every later session started in plan
+/// mode. Session scope may still record it (that session really is planning);
+/// global / project defaults drop it.
+fn sticky_mode(mode: Option<String>) -> Option<String> {
+    match mode {
+        Some(m) if m.trim().eq_ignore_ascii_case("plan") => None,
+        other => other,
+    }
+}
+
+/// Read a stored default mode, healing a `plan` value already on disk.
+pub(crate) fn non_plan_mode(mode: &str) -> String {
+    let m = mode.trim();
+    if m.is_empty() || m.eq_ignore_ascii_case("plan") {
+        return "agent".into();
+    }
+    m.to_string()
+}
+
+/// Persist `model_id` on the session row.
+///
+/// Returns the value back when there is no row yet (a draft) so the caller
+/// can seed the global default. A real chat keeps the model it was given.
+fn save_provider_on_session(session_id: Option<&str>, provider_id: String) -> Result<(), String> {
+    let Some(sid) = session_id.filter(|s| !s.is_empty()) else {
+        return Ok(());
+    };
+    let sid = sid.to_string();
+    update_sessions_index(move |list| {
+        if let Some(sess) = list.iter_mut().find(|s| s.id == sid) {
+            sess.provider_id = Some(provider_id);
+            sess.updated_at = Utc::now();
+        }
+        Ok(())
+    })
+}
+
+fn save_model_on_session(
+    session_id: Option<&str>,
+    model_id: String,
+) -> Result<Option<String>, String> {
+    let Some(sid) = session_id.filter(|s| !s.is_empty()) else {
+        return Ok(Some(model_id));
+    };
+    let sid = sid.to_string();
+    update_sessions_index(move |list| {
+        let Some(sess) = list.iter_mut().find(|s| s.id == sid) else {
+            return Ok(Some(model_id));
+        };
+        sess.model_id = Some(model_id);
+        sess.updated_at = Utc::now();
+        Ok(None)
+    })
+}
+
+/// Persist `effort` on the session row.
+///
+/// Returns the value back when there is no row to write to (draft chat that has
+/// not been created yet, or an unknown id) so the caller can seed the global
+/// default instead of dropping the choice.
+fn save_effort_on_session(
+    session_id: Option<&str>,
+    effort: String,
+) -> Result<Option<String>, String> {
+    let Some(sid) = session_id.filter(|s| !s.is_empty()) else {
+        return Ok(Some(effort));
+    };
+    let sid = sid.to_string();
+    update_sessions_index(move |list| {
+        let Some(sess) = list.iter_mut().find(|s| s.id == sid) else {
+            return Ok(Some(effort));
+        };
+        sess.effort = Some(effort);
+        sess.updated_at = Utc::now();
+        Ok(None)
+    })
+}
+
+/// Persist a partial composer prefs update at the configured scope.
+pub fn save_composer_prefs(
+    project_id: Option<&str>,
+    session_id: Option<&str>,
+    model_id: Option<String>,
+    effort: Option<String>,
+    mode: Option<String>,
+    permission_policy: Option<String>,
+    provider_id: Option<String>,
+) -> Result<ComposerPrefs, String> {
+    if let Some(provider) = provider_id.clone() {
+        save_provider_on_session(session_id, provider)?;
+    }
+    let settings = load_settings();
+    let scope = ComposerPrefsScope::parse(&settings.composer_prefs_scope);
+
+    // Model and effort are remembered per chat. Under the global / project
+    // scope they must not land in settings, or one chat's pick rewrites every
+    // other chat. `settings.model_id` only seeds a chat that never chose.
+    // Session scope already writes the row further down.
+    let model_id = if matches!(scope, ComposerPrefsScope::Session) {
+        model_id
+    } else {
+        match model_id {
+            Some(v) => save_model_on_session(session_id, v)?,
+            None => None,
+        }
+    };
+    // Effort is remembered per chat (see `resolve_composer_prefs`). Under the
+    // global / project scope it must not land in `settings.effort`, or raising
+    // effort in one chat rewrites every other chat that never chose its own.
+    // Session scope already writes the row further down.
+    let effort = if matches!(scope, ComposerPrefsScope::Session) {
+        effort
+    } else {
+        match effort {
+            Some(v) => save_effort_on_session(session_id, v)?,
+            None => None,
+        }
+    };
+
+    match scope {
+        ComposerPrefsScope::Global => {
+            let mut s = settings;
+            if let Some(v) = model_id {
+                s.model_id = Some(v);
+            }
+            if let Some(v) = effort {
+                s.effort = Some(v);
+            }
+            if let Some(v) = sticky_mode(mode) {
+                s.mode = v;
+            }
+            if let Some(v) = permission_policy {
+                s.permission_policy = v;
+            }
+            save_settings(&s)?;
+        }
+        ComposerPrefsScope::Project => {
+            let pid = project_id.filter(|s| !s.is_empty());
+            if let Some(pid) = pid {
+                let mut list = load_projects();
+                if let Some(p) = list.iter_mut().find(|p| p.id == pid) {
+                    if let Some(v) = model_id.clone() {
+                        p.model_id = Some(v);
+                    }
+                    if let Some(v) = effort.clone() {
+                        p.effort = Some(v);
+                    }
+                    if let Some(v) = sticky_mode(mode.clone()) {
+                        p.mode = Some(v);
+                    }
+                    if let Some(v) = permission_policy.clone() {
+                        p.permission_policy = Some(v);
+                    }
+                    save_projects(&list)?;
+                }
+            }
+            // Always mirror to global so orphan UIs / new projects still have a default.
+            let mut s = load_settings();
+            if let Some(v) = model_id {
+                s.model_id = Some(v);
+            }
+            if let Some(v) = effort {
+                s.effort = Some(v);
+            }
+            if let Some(v) = sticky_mode(mode) {
+                s.mode = v;
+            }
+            if let Some(v) = permission_policy {
+                s.permission_policy = v;
+            }
+            save_settings(&s)?;
+        }
+        ComposerPrefsScope::Session => {
+            let sid = session_id.filter(|s| !s.is_empty());
+            if let Some(sid) = sid {
+                let sid = sid.to_string();
+                let row_updated = update_sessions_index(|list| {
+                    let Some(sess) = list.iter_mut().find(|s| s.id == sid) else {
+                        return Ok(false);
+                    };
+                    if let Some(v) = model_id.clone() {
+                        sess.model_id = Some(v);
+                    }
+                    if let Some(v) = effort.clone() {
+                        sess.effort = Some(v);
+                    }
+                    if let Some(v) = mode.clone() {
+                        sess.mode = Some(v);
+                    }
+                    if let Some(v) = permission_policy.clone() {
+                        sess.permission_policy = Some(v);
+                    }
+                    sess.updated_at = Utc::now();
+                    Ok(true)
+                })?;
+                if !row_updated {
+                    // No session row yet — fall back to global so the chip still sticks.
+                    let mut s = load_settings();
+                    if let Some(v) = model_id {
+                        s.model_id = Some(v);
+                    }
+                    if let Some(v) = effort {
+                        s.effort = Some(v);
+                    }
+                    if let Some(v) = sticky_mode(mode) {
+                        s.mode = v;
+                    }
+                    if let Some(v) = permission_policy {
+                        s.permission_policy = v;
+                    }
+                    save_settings(&s)?;
+                }
+            } else {
+                let mut s = load_settings();
+                if let Some(v) = model_id {
+                    s.model_id = Some(v);
+                }
+                if let Some(v) = effort {
+                    s.effort = Some(v);
+                }
+                if let Some(v) = sticky_mode(mode) {
+                    s.mode = v;
+                }
+                if let Some(v) = permission_policy {
+                    s.permission_policy = v;
+                }
+                save_settings(&s)?;
+            }
+        }
+    }
+
+    Ok(resolve_composer_prefs(project_id, session_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+    use std::{
+        ffi::OsString,
+        path::{Path, PathBuf},
+        thread,
+    };
+
+    struct TempAppHome {
+        path: PathBuf,
+        previous: Option<OsString>,
+    }
+
+    impl Drop for TempAppHome {
+        fn drop(&mut self) {
+            match self.previous.take() {
+                Some(value) => std::env::set_var("GROK_APP_HOME", value),
+                None => std::env::remove_var("GROK_APP_HOME"),
+            }
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn with_temp_app_home<R>(label: &str, f: impl FnOnce(&Path) -> R) -> R {
+        let _lock = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let path = std::env::temp_dir().join(format!(
+            "grok-app-{label}-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        fs::create_dir_all(&path).expect("create isolated app home");
+        let home = TempAppHome {
+            previous: std::env::var_os("GROK_APP_HOME"),
+            path,
+        };
+        std::env::set_var("GROK_APP_HOME", &home.path);
+        ensure_app_dirs().expect("initialize isolated app home");
+        f(&home.path)
+    }
+
+    fn write_proxy_settings_fixture(mode: &str, proxy_url: Option<&str>) {
+        let mut value = serde_json::to_value(AppSettings::default()).expect("settings fixture");
+        let object = value.as_object_mut().expect("settings object");
+        object.insert("proxyMode".into(), serde_json::json!(mode));
+        match proxy_url {
+            Some(url) => {
+                object.insert("proxyUrl".into(), serde_json::json!(url));
+            }
+            None => {
+                object.remove("proxyUrl");
+            }
+        }
+        fs::write(
+            settings_file(),
+            serde_json::to_vec_pretty(&value).expect("serialize settings fixture"),
+        )
+        .expect("write settings fixture");
+    }
+
+    #[test]
+    fn non_plan_mode_heals_plan_default() {
+        // Plan mode must never be a sticky default: empty or "plan" → "agent".
+        assert_eq!(non_plan_mode(""), "agent");
+        assert_eq!(non_plan_mode("plan"), "agent");
+        assert_eq!(non_plan_mode("PLAN"), "agent");
+        assert_eq!(non_plan_mode("agent"), "agent");
+        assert_eq!(non_plan_mode("ask"), "ask");
+    }
+
+    #[test]
+    fn sticky_mode_drops_plan_for_global_persistence() {
+        assert_eq!(sticky_mode(None), None);
+        assert_eq!(sticky_mode(Some("plan".into())), None);
+        assert_eq!(sticky_mode(Some("PLAN".into())), None);
+        // Real sticky modes pass through.
+        assert_eq!(sticky_mode(Some("agent".into())), Some("agent".into()));
+        assert_eq!(sticky_mode(Some("ask".into())), Some("ask".into()));
+    }
+
+    #[test]
+    fn redact_scrubs_long_tokenish() {
+        let s = "header Bearer sk-abcdefghijklmnopqrstuvwxyz123456 tail";
+        let r = redact_text(s);
+        assert!(
+            !r.contains("sk-abcdefghijklmnopqrstuvwxyz123456")
+                || r.contains("REDACTED")
+                || r.contains("sk-")
+        );
+        assert!(!r.is_empty());
+    }
+
+    #[test]
+    fn normalize_project_color_tokens_and_hex() {
+        for tok in PROJECT_COLOR_TOKENS {
+            assert_eq!(
+                normalize_project_color(tok).as_deref(),
+                Some(*tok),
+                "token {tok}"
+            );
+            assert_eq!(
+                normalize_project_color(&format!("  {}  ", tok.to_uppercase())).as_deref(),
+                Some(*tok)
+            );
+        }
+        assert_eq!(normalize_project_color("#ABC").as_deref(), Some("#abc"));
+        assert_eq!(
+            normalize_project_color("#a1b2c3").as_deref(),
+            Some("#a1b2c3")
+        );
+        assert_eq!(
+            normalize_project_color("  #FfEeDd  ").as_deref(),
+            Some("#ffeedd")
+        );
+    }
+
+    #[test]
+    fn normalize_project_color_clears_and_rejects() {
+        for raw in [
+            "", "   ", "none", "NONE", "inherit", "default", "clear", "null",
+        ] {
+            assert_eq!(normalize_project_color(raw), None, "raw={raw:?}");
+        }
+        assert_eq!(normalize_project_color("red"), None);
+        assert_eq!(normalize_project_color("#gg0000"), None);
+        assert_eq!(normalize_project_color("#12"), None);
+        assert_eq!(normalize_project_color("#12345"), None);
+        assert_eq!(normalize_project_color("abc"), None);
+        assert_eq!(normalize_project_color("a1b2c3"), None); // missing #
+    }
+
+    #[test]
+    fn project_color_serde_default_missing_field() {
+        // Legacy projects.json rows without `color` deserialize to None.
+        let json = r#"{
+            "id": "p1",
+            "name": "Demo",
+            "path": "/tmp/demo",
+            "trusted": true,
+            "lastOpenedAt": "2026-01-01T00:00:00Z",
+            "pathOk": true
+        }"#;
+        let p: Project = serde_json::from_str(json).expect("legacy project");
+        assert!(p.color.is_none());
+        assert!(!p.pinned);
+    }
+
+    #[test]
+    fn take_store_quarantine_is_one_shot() {
+        // Seed the static as if a corrupt file was recovered.
+        {
+            let mut g = LAST_STORE_QUARANTINE.lock().unwrap();
+            *g = Some("/tmp/fake-corrupt-store.json".into());
+        }
+        let first = take_store_quarantine();
+        assert_eq!(first.as_deref(), Some("/tmp/fake-corrupt-store.json"));
+        assert!(take_store_quarantine().is_none());
+    }
+
+    #[test]
+    fn legacy_settings_file_is_flagged_for_pool_migration() {
+        // A settings.json written before the multi-session rework: complete, but
+        // the pool pinned at the old default and no migration marker.
+        let mut v = serde_json::to_value(AppSettings::default()).unwrap();
+        let obj = v.as_object_mut().unwrap();
+        obj.insert("maxConcurrentAgents".into(), serde_json::json!(3));
+        obj.remove("poolSizeMigrated");
+        let s: AppSettings = serde_json::from_value(v).expect("parse legacy settings");
+        assert_eq!(s.max_concurrent_agents, 3);
+        assert!(
+            !s.pool_size_migrated,
+            "missing marker must read as not-yet-migrated"
+        );
+        assert_eq!(
+            crate::process_limits::migrate_max_concurrent(
+                s.max_concurrent_agents,
+                s.pool_size_migrated
+            ),
+            Some(8)
+        );
+    }
+
+    #[test]
+    fn fresh_install_needs_no_pool_migration() {
+        let s = AppSettings::default();
+        assert!(s.pool_size_migrated);
+        assert_eq!(
+            crate::process_limits::migrate_max_concurrent(
+                s.max_concurrent_agents,
+                s.pool_size_migrated
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn proxy_mode_legacy_use_requires_a_valid_saved_url() {
+        assert_eq!(
+            normalize_proxy_mode(" USE ", Some(" http://127.0.0.1:18080 ")),
+            PROXY_MODE_MANUAL
+        );
+        assert_eq!(
+            normalize_proxy_mode("use", Some("127.0.0.1:18080")),
+            PROXY_MODE_SYSTEM
+        );
+        assert_eq!(normalize_proxy_mode("use", None), PROXY_MODE_SYSTEM);
+        assert_eq!(normalize_proxy_mode("direct", None), PROXY_MODE_NONE);
+        assert_eq!(
+            normalize_proxy_mode("future_mode", Some("http://127.0.0.1:1")),
+            PROXY_MODE_SYSTEM
+        );
+    }
+
+    #[test]
+    fn load_settings_migrates_legacy_proxy_fixture_without_real_home() {
+        with_temp_app_home("proxy-mode-load", |_| {
+            write_proxy_settings_fixture("use", Some("http://127.0.0.1:18080"));
+
+            let loaded = load_settings();
+            assert_eq!(loaded.proxy_mode, PROXY_MODE_MANUAL);
+            assert_eq!(loaded.proxy_url.as_deref(), Some("http://127.0.0.1:18080"));
+
+            let persisted: serde_json::Value =
+                serde_json::from_slice(&fs::read(settings_file()).expect("read migrated settings"))
+                    .expect("parse migrated settings");
+            assert_eq!(persisted["proxyMode"], PROXY_MODE_MANUAL);
+
+            write_proxy_settings_fixture("use", None);
+            let no_url = load_settings();
+            assert_eq!(no_url.proxy_mode, PROXY_MODE_SYSTEM);
+            let persisted: serde_json::Value =
+                serde_json::from_slice(&fs::read(settings_file()).expect("read no-url migration"))
+                    .expect("parse no-url migration");
+            assert_eq!(persisted["proxyMode"], PROXY_MODE_SYSTEM);
+        });
+    }
+
+    #[test]
+    fn save_settings_never_persists_legacy_proxy_mode() {
+        with_temp_app_home("proxy-mode-save", |_| {
+            let settings = AppSettings {
+                proxy_mode: LEGACY_PROXY_MODE_USE.into(),
+                proxy_url: Some("http://127.0.0.1:18080".into()),
+                ..AppSettings::default()
+            };
+            save_settings(&settings).expect("save normalized settings");
+
+            let persisted: serde_json::Value =
+                serde_json::from_slice(&fs::read(settings_file()).expect("read saved settings"))
+                    .expect("parse saved settings");
+            assert_eq!(persisted["proxyMode"], PROXY_MODE_MANUAL);
+        });
+    }
+
+    #[test]
+    fn missing_session_data_mode_deserializes_shared() {
+        let raw = r#"{
+            "theme": "dark",
+            "locale": "en",
+            "manualCliPath": null,
+            "permissionPolicy": "ask",
+            "modelId": null,
+            "effort": "medium",
+            "mode": "agent",
+            "onboardingDone": true,
+            "setupSkipped": false
+        }"#;
+        let s: AppSettings =
+            serde_json::from_str(raw).expect("deserialize without sessionDataMode");
+        assert_eq!(s.session_data_mode, "shared");
+    }
+
+    #[test]
+    fn default_settings_shared_mode() {
+        let s = AppSettings::default();
+        assert_eq!(s.session_data_mode, "shared");
+        assert_eq!(s.permission_policy, "ask");
+        assert_eq!(s.theme, "system");
+        assert_eq!(s.locale, "system");
+        assert!(s.locale_follow_system_migrated);
+        assert_eq!(s.max_concurrent_agents, 8);
+        assert_eq!(s.agent_idle_minutes, 30);
+        assert_eq!(s.stream_stall_seconds, 600);
+        assert!(s.stream_stall_default_migrated);
+        assert_eq!(s.sandbox_profile, "workspace");
+        assert!(!s.experimental_memory);
+        assert_eq!(s.compaction_mode, "summary");
+        assert_eq!(s.compaction_detail, "verbose");
+        assert!(!s.two_pass_compaction_enabled);
+        assert_eq!(s.max_agent_turns, None);
+        assert_eq!(s.background_wait_policy, "wait");
+        assert_eq!(s.background_wait_timeout_sec, 600);
+        assert!(!s.include_partial_messages);
+        assert!(!s.disable_web_search);
+        assert!(!s.no_ask_user);
+        assert!(s.disallowed_tools.is_empty());
+        assert!(s.allowed_tools.is_empty());
+        assert!(s.plan_enabled);
+        assert!(s.subagents_enabled);
+        assert!(!s.subagent_worktree_snapshot_enabled);
+        assert!(s.workflows_enabled);
+        assert!(s.effort_default_migrated);
+        assert!(s.official_model_default_migrated);
+        assert!(s.workflows_default_migrated);
+        assert_eq!(s.effort.as_deref(), Some("xhigh"));
+        assert_eq!(s.model_id.as_deref(), Some("grok-4.7"));
+        assert!(s.official_model_47_migrated);
+        assert!(s.official_effort_xhigh_migrated);
+        assert!(s.official_effort_xhigh_rows_migrated);
+        assert_eq!(s.preferred_agent, "");
+        assert_eq!(s.agent_profile_path, "");
+        assert_eq!(s.agents_json, "");
+        assert!(!s.use_leader);
+    }
+
+    #[test]
+    fn migrate_legacy_effort_lifts_medium_and_unset() {
+        assert_eq!(migrate_legacy_effort_default(None).as_deref(), Some("high"));
+        assert_eq!(
+            migrate_legacy_effort_default(Some("")).as_deref(),
+            Some("high")
+        );
+        assert_eq!(
+            migrate_legacy_effort_default(Some("  medium  ")).as_deref(),
+            Some("high")
+        );
+        assert_eq!(migrate_legacy_effort_default(Some("low")), None);
+        assert_eq!(migrate_legacy_effort_default(Some("high")), None);
+        assert_eq!(migrate_legacy_effort_default(Some("max")), None);
+    }
+
+    #[test]
+    fn migrate_legacy_official_model_lifts_4_5_and_unset() {
+        assert_eq!(
+            migrate_legacy_official_model_default(None).as_deref(),
+            Some("grok-4.6")
+        );
+        assert_eq!(
+            migrate_legacy_official_model_default(Some("")).as_deref(),
+            Some("grok-4.6")
+        );
+        assert_eq!(
+            migrate_legacy_official_model_default(Some("  grok-4.5  ")).as_deref(),
+            Some("grok-4.6")
+        );
+        assert_eq!(
+            migrate_legacy_official_model_default(Some("grok-4.6")),
+            None
+        );
+        assert_eq!(
+            migrate_legacy_official_model_default(Some("custom-relay")),
+            None
+        );
+    }
+
+    #[test]
+    fn migrate_official_model_46_lifts_only_previous_default() {
+        assert_eq!(
+            migrate_official_model_46_to_47(None).as_deref(),
+            Some("grok-4.7")
+        );
+        assert_eq!(
+            migrate_official_model_46_to_47(Some("")).as_deref(),
+            Some("grok-4.7")
+        );
+        assert_eq!(
+            migrate_official_model_46_to_47(Some("  grok-4.6  ")).as_deref(),
+            Some("grok-4.7")
+        );
+        assert_eq!(migrate_official_model_46_to_47(Some("grok-4.7")), None);
+        assert_eq!(
+            migrate_official_model_46_to_47(Some("grok-4.7-build-fast")),
+            None
+        );
+        assert_eq!(migrate_official_model_46_to_47(Some("grok-4.5")), None);
+        assert_eq!(migrate_official_model_46_to_47(Some("custom-relay")), None);
+    }
+
+    #[test]
+    fn migrate_official_effort_lifts_high_and_unset() {
+        assert_eq!(
+            migrate_official_effort_to_xhigh(None).as_deref(),
+            Some("xhigh")
+        );
+        assert_eq!(
+            migrate_official_effort_to_xhigh(Some("  high  ")).as_deref(),
+            Some("xhigh")
+        );
+        assert_eq!(migrate_official_effort_to_xhigh(Some("low")), None);
+        assert_eq!(migrate_official_effort_to_xhigh(Some("medium")), None);
+        assert_eq!(migrate_official_effort_to_xhigh(Some("xhigh")), None);
+    }
+
+    #[test]
+    fn official_effort_row_lift_skips_4_5_and_custom() {
+        assert!(row_should_lift_official_high_to_xhigh(
+            Some("grok-4.6"),
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(row_should_lift_official_high_to_xhigh(
+            None,
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(!row_should_lift_official_high_to_xhigh(
+            Some("grok-4.5"),
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(!row_should_lift_official_high_to_xhigh(
+            Some("my-relay"),
+            Some("high"),
+            Some("grok-4.6"),
+        ));
+        assert!(!row_should_lift_official_high_to_xhigh(
+            Some("grok-4.6"),
+            Some("low"),
+            Some("grok-4.6"),
+        ));
+    }
+
+    #[test]
+    fn clamp_effort_drops_xhigh_on_4_5() {
+        assert_eq!(clamp_effort_for_model("grok-4.5", "xhigh"), "high");
+        assert_eq!(clamp_effort_for_model("grok-4.6", "xhigh"), "xhigh");
+        assert_eq!(clamp_effort_for_model("grok-4.7", "xhigh"), "xhigh");
+        assert_eq!(
+            clamp_effort_for_model("grok-4.7-build-fast", "xhigh"),
+            "xhigh"
+        );
+        assert_eq!(clamp_effort_for_model("custom-relay", "xhigh"), "xhigh");
+    }
+
+    #[test]
+    fn migrate_legacy_locale_en_to_system() {
+        assert_eq!(
+            migrate_legacy_locale_default(Some("en")).as_deref(),
+            Some("system")
+        );
+        assert_eq!(
+            migrate_legacy_locale_default(Some("EN")).as_deref(),
+            Some("system")
+        );
+        assert_eq!(migrate_legacy_locale_default(Some("zh")), None);
+        assert_eq!(migrate_legacy_locale_default(Some("zh-TW")), None);
+        assert_eq!(migrate_legacy_locale_default(Some("system")), None);
+        assert_eq!(
+            migrate_legacy_locale_default(Some("")).as_deref(),
+            Some("system")
+        );
+        assert_eq!(
+            migrate_legacy_locale_default(None).as_deref(),
+            Some("system")
+        );
+    }
+
+    #[test]
+    fn legacy_json_locale_en_is_unmigrated() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.locale, "en");
+        assert!(!s.locale_follow_system_migrated);
+    }
+
+    #[test]
+    fn legacy_json_effort_medium_deserializes_unmigrated() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.effort.as_deref(), Some("medium"));
+        assert!(!s.effort_default_migrated);
+        assert!(!s.workflows_default_migrated);
+        // Missing workflowsEnabled → new serde default true (cold field only);
+        // persisted false from old AppSettings still migrates via flag in load_settings.
+        assert!(s.workflows_enabled);
+    }
+
+    #[test]
+    fn workflows_enabled_false_when_explicit_in_json() {
+        let raw = r#"{
+            "theme": "dark",
+            "locale": "en",
+            "sessionDataMode": "independent",
+            "manualCliPath": null,
+            "permissionPolicy": "ask",
+            "modelId": null,
+            "effort": "high",
+            "mode": "agent",
+            "onboardingDone": true,
+            "setupSkipped": false,
+            "workflowsEnabled": false
+        }"#;
+        let s: AppSettings = serde_json::from_str(raw).expect("deserialize");
+        assert!(!s.workflows_enabled);
+        assert!(!s.workflows_default_migrated);
+    }
+
+    /// Minimal legacy settings JSON (pre-batch fields omitted).
+    fn legacy_settings_json() -> &'static str {
+        r#"{
+            "theme": "dark",
+            "locale": "en",
+            "sessionDataMode": "independent",
+            "manualCliPath": null,
+            "permissionPolicy": "ask",
+            "modelId": null,
+            "effort": "medium",
+            "mode": "agent",
+            "onboardingDone": true,
+            "setupSkipped": false
+        }"#
+    }
+
+    #[test]
+    fn resolve_sandbox_profile_prefers_project_override() {
+        assert_eq!(
+            resolve_sandbox_profile("workspace", Some("strict")),
+            "strict"
+        );
+        assert_eq!(resolve_sandbox_profile("strict", Some("off")), "off");
+        assert_eq!(
+            resolve_sandbox_profile("workspace", Some("inherit")),
+            "workspace"
+        );
+        assert_eq!(resolve_sandbox_profile("workspace", None), "workspace");
+        assert_eq!(resolve_sandbox_profile("bogus", Some("")), "workspace");
+        assert_eq!(
+            resolve_sandbox_profile("  WorkSpace  ", Some("  DEVBOX  ")),
+            "devbox"
+        );
+    }
+
+    #[test]
+    fn composer_editor_defaults_legacy_and_round_trips() {
+        let missing: AppSettings =
+            serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(missing.composer_editor, "legacy");
+        assert_eq!(normalize_composer_editor("tiptap"), "tiptap");
+        assert_eq!(normalize_composer_editor("nope"), "legacy");
+
+        let s = AppSettings {
+            composer_editor: "tiptap".into(),
+            ..AppSettings::default()
+        };
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert!(json.contains("\"composerEditor\":\"tiptap\""));
+        let back: AppSettings = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.composer_editor, "tiptap");
+    }
+
+    #[test]
+    fn sandbox_profile_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.sandbox_profile, "workspace");
+    }
+
+    #[test]
+    fn max_agent_turns_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.max_agent_turns, None);
+    }
+
+    #[test]
+    fn preferred_agent_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.preferred_agent, "");
+    }
+
+    #[test]
+    fn agent_profile_path_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.agent_profile_path, "");
+    }
+
+    #[test]
+    fn agents_json_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.agents_json, "");
+    }
+
+    #[test]
+    fn agents_json_round_trips_camel_case() {
+        let s = AppSettings {
+            agents_json: r#"{"reviewer":{"prompt":"x"}}"#.into(),
+            ..AppSettings::default()
+        };
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert!(json.contains("\"agentsJson\""));
+        let back: AppSettings = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.agents_json, r#"{"reviewer":{"prompt":"x"}}"#);
+    }
+
+    #[test]
+    fn use_leader_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.use_leader);
+    }
+
+    #[test]
+    fn disable_web_search_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.disable_web_search);
+    }
+
+    #[test]
+    fn no_ask_user_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.no_ask_user);
+    }
+
+    #[test]
+    fn session_no_ask_user_defaults_none_when_missing() {
+        let raw = r#"{"id":"s1","projectId":null,"title":"t","agentSessionId":null,"createdAt":"2020-01-01T00:00:00Z","updatedAt":"2020-01-01T00:00:00Z"}"#;
+        let m: SessionMeta = serde_json::from_str(raw).expect("legacy session without noAskUser");
+        assert!(m.no_ask_user.is_none());
+    }
+
+    #[test]
+    fn disallowed_tools_defaults_empty_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.disallowed_tools.is_empty());
+    }
+
+    #[test]
+    fn disallowed_tools_round_trips_camel_case() {
+        let s = AppSettings {
+            disallowed_tools: vec!["web_search".into(), "write".into()],
+            ..AppSettings::default()
+        };
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert!(json.contains("\"disallowedTools\""));
+        let back: AppSettings = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            back.disallowed_tools,
+            vec!["web_search".to_string(), "write".to_string()]
+        );
+    }
+
+    #[test]
+    fn allowed_tools_defaults_empty_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.allowed_tools.is_empty());
+    }
+
+    #[test]
+    fn allowed_tools_round_trips_camel_case() {
+        let s = AppSettings {
+            allowed_tools: vec!["web_search".into(), "write".into()],
+            ..AppSettings::default()
+        };
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert!(json.contains("\"allowedTools\""));
+        let back: AppSettings = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            back.allowed_tools,
+            vec!["web_search".to_string(), "write".to_string()]
+        );
+    }
+
+    #[test]
+    fn project_spaces_default_empty_and_round_trip() {
+        let missing: AppSettings =
+            serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(missing.project_spaces.is_empty());
+        assert!(missing.active_project_space_id.is_none());
+        assert!(missing.project_space_by_id.is_empty());
+
+        let mut by_id = HashMap::new();
+        by_id.insert("p1".into(), "space:work".into());
+        let s = AppSettings {
+            project_spaces: vec![ProjectSpaceRecord {
+                id: "space:work".into(),
+                name: "Work".into(),
+            }],
+            active_project_space_id: Some("space:work".into()),
+            project_space_by_id: by_id,
+            ..AppSettings::default()
+        };
+        let json = serde_json::to_string(&s).expect("serialize");
+        assert!(json.contains("\"projectSpaces\""));
+        assert!(json.contains("\"activeProjectSpaceId\""));
+        assert!(json.contains("\"projectSpaceById\""));
+        let back: AppSettings = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.project_spaces[0].name, "Work");
+        assert_eq!(back.active_project_space_id.as_deref(), Some("space:work"));
+        assert_eq!(
+            back.project_space_by_id.get("p1").map(String::as_str),
+            Some("space:work")
+        );
+    }
+
+    #[test]
+    fn include_partial_messages_defaults_false_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.include_partial_messages);
+    }
+
+    #[test]
+    fn plan_enabled_defaults_true_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.plan_enabled);
+    }
+
+    #[test]
+    fn subagents_enabled_defaults_true_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.subagents_enabled);
+    }
+
+    #[test]
+    fn subagent_worktree_snapshot_defaults_false_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.subagent_worktree_snapshot_enabled);
+        assert!(!AppSettings::default().subagent_worktree_snapshot_enabled);
+    }
+
+    #[test]
+    fn auto_wake_defaults_false_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.auto_wake_enabled);
+        assert!(!AppSettings::default().auto_wake_enabled);
+    }
+
+    #[test]
+    fn workflows_enabled_defaults_true_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.workflows_enabled);
+        assert!(AppSettings::default().workflows_enabled);
+    }
+
+    #[test]
+    fn notify_prefs_default_true_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.notify_on_turn_done);
+        assert!(s.notify_on_permission);
+        let d = AppSettings::default();
+        assert!(d.notify_on_turn_done);
+        assert!(d.notify_on_permission);
+    }
+
+    #[test]
+    fn sidebar_other_sessions_open_defaults_true_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.sidebar_other_sessions_open);
+        assert!(AppSettings::default().sidebar_other_sessions_open);
+        let closed: AppSettings = serde_json::from_str(
+            r#"{"theme":"system","locale":"en","sessionDataMode":"independent","permissionPolicy":"ask","mode":"agent","onboardingDone":false,"setupSkipped":false,"sidebarOtherSessionsOpen":false}"#,
+        )
+        .expect("deserialize closed");
+        assert!(!closed.sidebar_other_sessions_open);
+    }
+
+    #[test]
+    fn launch_at_login_defaults_false_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.launch_at_login);
+        assert!(!AppSettings::default().launch_at_login);
+    }
+
+    #[test]
+    fn keep_tray_for_schedules_defaults_true_when_missing() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(s.keep_tray_for_schedules);
+        assert!(AppSettings::default().keep_tray_for_schedules);
+        assert!(!s.schedules_launch_agent);
+        assert!(!AppSettings::default().schedules_launch_agent);
+    }
+
+    #[test]
+    fn compaction_mode_detail_defaults_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.compaction_mode, "summary");
+        assert_eq!(s.compaction_detail, "verbose");
+        let d = AppSettings::default();
+        assert_eq!(d.compaction_mode, "summary");
+        assert_eq!(d.compaction_detail, "verbose");
+    }
+
+    #[test]
+    fn two_pass_compaction_defaults_false_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.two_pass_compaction_enabled);
+        assert!(!AppSettings::default().two_pass_compaction_enabled);
+    }
+
+    #[test]
+    fn experimental_memory_defaults_false_when_missing_from_json() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert!(!s.experimental_memory);
+    }
+
+    #[test]
+    fn audit_ledger_retention_defaults_unlimited_when_missing() {
+        let s: AppSettings = serde_json::from_str(legacy_settings_json()).expect("deserialize");
+        assert_eq!(s.audit_ledger_retention_days, 0);
+        assert_eq!(AppSettings::default().audit_ledger_retention_days, 0);
+    }
+
+    #[test]
+    fn session_plugin_dirs_default_empty_and_normalize() {
+        let raw = r#"{"id":"s1","projectId":null,"title":"t","agentSessionId":null,"createdAt":"2020-01-01T00:00:00Z","updatedAt":"2020-01-01T00:00:00Z"}"#;
+        let m: SessionMeta = serde_json::from_str(raw).expect("legacy session without pluginDirs");
+        assert!(m.plugin_dirs.is_empty());
+        assert_eq!(
+            normalize_plugin_dirs(vec!["  /a  ".into(), "".into(), "/a".into(), "/b".into()]),
+            vec!["/a".to_string(), "/b".to_string()]
+        );
+    }
+
+    fn sample_session(id: &str, pinned: bool, updated: DateTime<Utc>) -> SessionMeta {
+        SessionMeta {
+            id: id.into(),
+            project_id: None,
+            title: id.into(),
+            agent_session_id: None,
+            created_at: updated,
+            updated_at: updated,
+            model_id: None,
+            archived: false,
+            pinned,
+            effort: None,
+            mode: None,
+            permission_policy: None,
+            json_schema: None,
+            scheduled: false,
+            worktree_path: None,
+            worktree_branch: None,
+            is_worktree_session: false,
+            plugin_dirs: Vec::new(),
+            extra_rules: None,
+            max_agent_turns: None,
+            system_prompt_override: None,
+            fork_agent_session: false,
+            fork_rewind_prompt_index: None,
+            no_ask_user: None,
+            workspace_id: None,
+            workspace_root_snapshot: None,
+            workspace_capability: None,
+            provider_id: None,
+        }
+    }
+
+    #[test]
+    fn effort_change_can_invalidate_cli_session_resume() {
+        let now = Utc::now();
+        let mut keep = sample_session("keep", false, now);
+        keep.agent_session_id = Some("agent-keep".into());
+        let mut changed = sample_session("changed", false, now);
+        changed.agent_session_id = Some("agent-old".into());
+        let mut sessions = vec![keep, changed];
+
+        assert!(clear_agent_session_id(&mut sessions, "changed"));
+        assert_eq!(sessions[0].agent_session_id.as_deref(), Some("agent-keep"));
+        assert!(sessions[1].agent_session_id.is_none());
+        assert!(!clear_agent_session_id(&mut sessions, "changed"));
+    }
+
+    #[test]
+    fn session_extra_rules_default_none_and_sanitize() {
+        let raw = r#"{"id":"s1","projectId":null,"title":"t","agentSessionId":null,"createdAt":"2020-01-01T00:00:00Z","updatedAt":"2020-01-01T00:00:00Z"}"#;
+        let m: SessionMeta = serde_json::from_str(raw).expect("legacy session without extraRules");
+        assert!(m.extra_rules.is_none());
+        assert_eq!(sanitize_extra_rules(None), None);
+        assert_eq!(sanitize_extra_rules(Some("  ".into())), None);
+        assert_eq!(
+            sanitize_extra_rules(Some("  prefer tests  ".into())).as_deref(),
+            Some("prefer tests")
+        );
+        let long = "x".repeat(EXTRA_RULES_MAX_CHARS + 10);
+        let capped = sanitize_extra_rules(Some(long)).expect("capped");
+        assert_eq!(capped.chars().count(), EXTRA_RULES_MAX_CHARS);
+    }
+
+    #[test]
+    fn session_max_agent_turns_default_none_and_normalize() {
+        let raw = r#"{"id":"s1","projectId":null,"title":"t","agentSessionId":null,"createdAt":"2020-01-01T00:00:00Z","updatedAt":"2020-01-01T00:00:00Z"}"#;
+        let m: SessionMeta =
+            serde_json::from_str(raw).expect("legacy session without maxAgentTurns");
+        assert!(m.max_agent_turns.is_none());
+        assert_eq!(crate::acp_client::normalize_max_agent_turns(None), None);
+        assert_eq!(crate::acp_client::normalize_max_agent_turns(Some(0)), None);
+        assert_eq!(
+            crate::acp_client::normalize_max_agent_turns(Some(50)),
+            Some(50)
+        );
+        assert_eq!(
+            crate::acp_client::normalize_max_agent_turns(Some(1)),
+            Some(1)
+        );
+        assert_eq!(
+            crate::acp_client::normalize_max_agent_turns(Some(200)),
+            Some(200)
+        );
+        assert_eq!(
+            crate::acp_client::normalize_max_agent_turns(Some(999)),
+            Some(200)
+        );
+    }
+
+    #[test]
+    fn session_system_prompt_override_default_none_and_sanitize() {
+        let raw = r#"{"id":"s1","projectId":null,"title":"t","agentSessionId":null,"createdAt":"2020-01-01T00:00:00Z","updatedAt":"2020-01-01T00:00:00Z"}"#;
+        let m: SessionMeta =
+            serde_json::from_str(raw).expect("legacy session without systemPromptOverride");
+        assert!(m.system_prompt_override.is_none());
+        assert_eq!(sanitize_system_prompt_override(None), None);
+        assert_eq!(sanitize_system_prompt_override(Some("  ".into())), None);
+        assert_eq!(
+            sanitize_system_prompt_override(Some("  You are helpful  ".into())).as_deref(),
+            Some("You are helpful")
+        );
+        // Strip NUL bytes.
+        assert_eq!(
+            sanitize_system_prompt_override(Some("a\0b\0c".into())).as_deref(),
+            Some("abc")
+        );
+        assert_eq!(sanitize_system_prompt_override(Some("\0\0".into())), None);
+        let long = "x".repeat(SYSTEM_PROMPT_OVERRIDE_MAX_CHARS + 10);
+        let capped = sanitize_system_prompt_override(Some(long)).expect("capped");
+        assert_eq!(capped.chars().count(), SYSTEM_PROMPT_OVERRIDE_MAX_CHARS);
+    }
+
+    #[test]
+    fn general_workspace_dir_exists_without_sidebar_project() {
+        let _ = ensure_app_dirs();
+        let path = ensure_general_workspace_dir().expect("ensure dir");
+        assert!(path.is_dir());
+        let listed = load_projects();
+        assert!(
+            listed
+                .iter()
+                .all(|p| p.id != GENERAL_PROJECT_ID && !p.system),
+            "general must not appear as a project: {:?}",
+            listed.iter().map(|p| &p.id).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn create_session_defaults_to_orphan() {
+        // Isolated home: parallel tests share default data dir and can race
+        // atomic renames into sessions_index (macOS CI flake).
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-create-orphan-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+        let meta = create_session(None, Some("t".into()), false).expect("create");
+        assert!(meta.project_id.is_none(), "got {:?}", meta.project_id);
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn fork_session_partial_stores_rewind_index() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-fork-rewind-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut src = create_session(None, Some("src".into()), false).expect("create");
+        src.agent_session_id = Some("agent-parent".into());
+        update_session_meta(&src).expect("meta");
+        let parent_msgs: Vec<_> = (1u32..=8)
+            .flat_map(|i| {
+                [
+                    stored_msg(&format!("u{i}"), "user", &format!("q{i}"), None),
+                    stored_msg(&format!("a{i}"), "assistant", &format!("a{i}"), None),
+                ]
+            })
+            .collect();
+        save_messages(&src.id, &parent_msgs).expect("msgs");
+
+        let partial = fork_session(&src.id, Some(4), None, true).expect("partial");
+        assert_eq!(partial.agent_session_id.as_deref(), Some("agent-parent"));
+        assert!(partial.fork_agent_session);
+        assert_eq!(partial.fork_rewind_prompt_index, Some(4));
+        let kept = load_messages(&partial.id);
+        assert_eq!(kept.len(), 10, "through fifth turn only");
+        assert_eq!(kept.last().map(|m| m.content.as_str()), Some("a5"));
+        assert_eq!(load_messages(&src.id).len(), 16, "parent journal unchanged");
+        assert_eq!(
+            load_sessions_index()
+                .iter()
+                .find(|s| s.id == src.id)
+                .and_then(|s| s.agent_session_id.as_deref()),
+            Some("agent-parent"),
+            "parent agent id unchanged"
+        );
+
+        let full = fork_session(&src.id, None, None, true).expect("full");
+        assert!(full.fork_agent_session);
+        assert_eq!(full.fork_rewind_prompt_index, None);
+        assert_eq!(load_messages(&full.id).len(), 16);
+
+        let journal_only = fork_session(&src.id, Some(4), None, false).expect("journal");
+        assert!(!journal_only.fork_agent_session);
+        assert_eq!(journal_only.fork_rewind_prompt_index, None);
+        assert!(journal_only.agent_session_id.is_none());
+        assert_eq!(load_messages(&journal_only.id).len(), 10);
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn fork_session_copies_workspace_binding() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-fork-ws-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut src = create_session(None, Some("src".into()), false).expect("create");
+        src.workspace_id = Some("ws_abc".into());
+        src.workspace_root_snapshot = Some("p:w:/a|e:w:/b".into());
+        src.workspace_capability = Some("extra_write_active".into());
+        update_session_meta(&src).expect("meta");
+
+        let fork = fork_session(&src.id, None, None, false).expect("fork");
+        assert_eq!(fork.workspace_id.as_deref(), Some("ws_abc"));
+        assert_eq!(
+            fork.workspace_root_snapshot.as_deref(),
+            Some("p:w:/a|e:w:/b")
+        );
+        assert_eq!(
+            fork.workspace_capability.as_deref(),
+            Some("extra_write_active")
+        );
+
+        let _ = delete_session(&src.id);
+        let _ = delete_session(&fork.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    fn eight_turn_parent_msgs() -> Vec<ChatMessageStored> {
+        (1u32..=8)
+            .flat_map(|i| {
+                [
+                    stored_msg(&format!("u{i}"), "user", &format!("q{i}"), None),
+                    stored_msg(&format!("a{i}"), "assistant", &format!("a{i}"), None),
+                ]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn retruncate_child_journal_to_cut_persists_inflated_partial_fork() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-retruncate-inflated-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut src = create_session(None, Some("src".into()), false).expect("create");
+        src.agent_session_id = Some("agent-parent".into());
+        update_session_meta(&src).expect("meta");
+        let parent_msgs = eight_turn_parent_msgs();
+        save_messages(&src.id, &parent_msgs).expect("msgs");
+
+        let child = fork_session(&src.id, Some(4), None, true).expect("partial");
+        assert_eq!(load_messages(&child.id).len(), 10);
+        replace_messages(&child.id, &parent_msgs).expect("inflate");
+        assert_eq!(load_messages(&child.id).len(), 16);
+
+        let (before, after, persisted) =
+            retruncate_child_journal_to_cut(&child.id, 4).expect("retruncate");
+        assert_eq!(before, 16);
+        assert_eq!(after, 10, "through fifth turn only");
+        assert!(persisted);
+        let kept = load_messages(&child.id);
+        assert_eq!(kept.len(), 10);
+        assert_eq!(kept.last().map(|m| m.content.as_str()), Some("a5"));
+        assert_eq!(load_messages(&src.id).len(), 16, "parent journal unchanged");
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn retruncate_child_journal_to_cut_skips_unchanged_partial_fork() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-retruncate-unchanged-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut src = create_session(None, Some("src".into()), false).expect("create");
+        src.agent_session_id = Some("agent-parent".into());
+        update_session_meta(&src).expect("meta");
+        save_messages(&src.id, &eight_turn_parent_msgs()).expect("msgs");
+        let child = fork_session(&src.id, Some(4), None, true).expect("partial");
+        assert_eq!(load_messages(&child.id).len(), 10);
+
+        let (before, after, persisted) =
+            retruncate_child_journal_to_cut(&child.id, 4).expect("retruncate");
+        assert_eq!(before, 10);
+        assert_eq!(after, 10);
+        assert!(!persisted);
+        assert_eq!(load_messages(&child.id).len(), 10);
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn clear_fork_oneshots_clears_rewind_index() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-fork-oneshot-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut src = create_session(None, Some("src".into()), false).expect("create");
+        src.agent_session_id = Some("agent-parent".into());
+        update_session_meta(&src).expect("meta");
+        save_messages(
+            &src.id,
+            &[
+                stored_msg("u1", "user", "first", None),
+                stored_msg("a1", "assistant", "ok", None),
+            ],
+        )
+        .expect("msgs");
+        let child = fork_session(&src.id, Some(0), None, true).expect("partial");
+        assert_eq!(child.fork_rewind_prompt_index, Some(0));
+        let cleared = set_session_fork_agent_session(&child.id, false).expect("clear");
+        assert!(!cleared.fork_agent_session);
+        assert_eq!(cleared.fork_rewind_prompt_index, None);
+        assert_eq!(cleared.agent_session_id.as_deref(), Some("agent-parent"));
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn clear_session_fork_after_connect_failure_partial_drops_agent_id() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-fork-fail-partial-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut meta = create_session(None, Some("partial-fail".into()), false).expect("create");
+        meta.agent_session_id = Some("agent-parent".into());
+        meta.fork_agent_session = true;
+        meta.fork_rewind_prompt_index = Some(4);
+        update_session_meta(&meta).expect("meta");
+
+        let cleared = clear_session_fork_after_connect_failure(&meta.id).expect("clear");
+        assert!(cleared.agent_session_id.is_none());
+        assert!(!cleared.fork_agent_session);
+        assert_eq!(cleared.fork_rewind_prompt_index, None);
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn clear_session_fork_after_connect_failure_full_keeps_agent_id() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-fork-fail-full-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut meta = create_session(None, Some("full-fail".into()), false).expect("create");
+        meta.agent_session_id = Some("agent-parent".into());
+        meta.fork_agent_session = true;
+        meta.fork_rewind_prompt_index = None;
+        update_session_meta(&meta).expect("meta");
+
+        let cleared = clear_session_fork_after_connect_failure(&meta.id).expect("clear");
+        assert_eq!(cleared.agent_session_id.as_deref(), Some("agent-parent"));
+        assert!(!cleared.fork_agent_session);
+        assert_eq!(cleared.fork_rewind_prompt_index, None);
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn set_session_worktree_marks_and_clears() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-wt-meta-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+        let meta = create_session(None, Some("wt".into()), false).expect("create");
+        assert!(!meta.is_worktree_session);
+        assert!(meta.worktree_path.is_none());
+        let marked = set_session_worktree(
+            &meta.id,
+            Some("/tmp/repo-feat".into()),
+            Some("feat/x".into()),
+        )
+        .expect("set");
+        assert!(marked.is_worktree_session);
+        assert_eq!(marked.worktree_path.as_deref(), Some("/tmp/repo-feat"));
+        assert_eq!(marked.worktree_branch.as_deref(), Some("feat/x"));
+        let cleared = set_session_worktree(&meta.id, None, None).expect("clear");
+        assert!(!cleared.is_worktree_session);
+        assert!(cleared.worktree_path.is_none());
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn session_meta_deserializes_without_worktree_fields() {
+        let raw = r#"{
+            "id":"s1","projectId":null,"title":"t",
+            "agentSessionId":null,
+            "createdAt":"2020-01-01T00:00:00Z",
+            "updatedAt":"2020-01-01T00:00:00Z",
+            "modelId":null,"archived":false,"pinned":false,"scheduled":false
+        }"#;
+        let m: SessionMeta = serde_json::from_str(raw).expect("legacy meta");
+        assert!(!m.is_worktree_session);
+        assert!(m.worktree_path.is_none());
+        assert!(m.worktree_branch.is_none());
+    }
+
+    #[test]
+    fn migrate_legacy_general_project_rehomes_sessions() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-migrate-general-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+        // Seed a legacy system:general row + bound session.
+        let mut projects: Vec<Project> = read_json_recover(&projects_file());
+        projects.retain(|p| p.id != GENERAL_PROJECT_ID);
+        projects.push(Project {
+            id: GENERAL_PROJECT_ID.into(),
+            name: "General".into(),
+            path: crate::paths::general_workspace_dir()
+                .to_string_lossy()
+                .to_string(),
+            trusted: true,
+            last_opened_at: Utc::now(),
+            path_ok: true,
+            pinned: true,
+            system: true,
+            model_id: None,
+            effort: None,
+            mode: None,
+            permission_policy: None,
+            sandbox_profile: None,
+            color: None,
+            ssh_alias: None,
+        });
+        write_json(&projects_file(), &projects).expect("seed projects");
+        let mut sessions: Vec<SessionMeta> = read_json_recover(&sessions_index_file());
+        let sid = format!("migrate-general-{}", Uuid::new_v4());
+        sessions.insert(
+            0,
+            SessionMeta {
+                id: sid.clone(),
+                project_id: Some(GENERAL_PROJECT_ID.into()),
+                title: "legacy".into(),
+                agent_session_id: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+                model_id: None,
+                archived: false,
+                pinned: false,
+                effort: None,
+                mode: None,
+                permission_policy: None,
+                json_schema: None,
+                scheduled: false,
+                worktree_path: None,
+                worktree_branch: None,
+                is_worktree_session: false,
+                plugin_dirs: Vec::new(),
+                extra_rules: None,
+                max_agent_turns: None,
+                system_prompt_override: None,
+                fork_agent_session: false,
+                fork_rewind_prompt_index: None,
+                no_ask_user: None,
+                workspace_id: None,
+                workspace_root_snapshot: None,
+                workspace_capability: None,
+                provider_id: None,
+            },
+        );
+        write_json(&sessions_index_file(), &sessions).expect("seed sessions");
+
+        let listed = load_projects();
+        assert!(listed.iter().all(|p| p.id != GENERAL_PROJECT_ID));
+        let reloaded = load_sessions_index();
+        let hit = reloaded.iter().find(|s| s.id == sid).expect("session");
+        assert!(hit.project_id.is_none(), "got {:?}", hit.project_id);
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn sessions_sort_pinned_first_then_updated_at() {
+        let t1 = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let t2 = Utc.with_ymd_and_hms(2024, 1, 2, 0, 0, 0).unwrap();
+        let t3 = Utc.with_ymd_and_hms(2024, 1, 3, 0, 0, 0).unwrap();
+        let mut list = vec![
+            sample_session("unpinned-mid", false, t2),
+            sample_session("pinned-old", true, t1),
+            sample_session("unpinned-new", false, t3),
+            sample_session("pinned-new", true, t3),
+        ];
+        sort_sessions_by_pin_then_updated(&mut list);
+        let ids: Vec<&str> = list.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["pinned-old", "pinned-new", "unpinned-new", "unpinned-mid"]
+        );
+    }
+
+    fn sample_project(id: &str, pinned: bool, opened: DateTime<Utc>) -> Project {
+        Project {
+            id: id.into(),
+            name: id.into(),
+            path: format!("/tmp/{id}"),
+            trusted: true,
+            last_opened_at: opened,
+            path_ok: true,
+            pinned,
+            system: false,
+            model_id: None,
+            effort: None,
+            mode: None,
+            permission_policy: None,
+            sandbox_profile: None,
+            color: None,
+            ssh_alias: None,
+        }
+    }
+
+    #[test]
+    fn project_pin_partition_preserves_relative_order() {
+        let t1 = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let t2 = Utc.with_ymd_and_hms(2024, 1, 2, 0, 0, 0).unwrap();
+        let t3 = Utc.with_ymd_and_hms(2024, 1, 3, 0, 0, 0).unwrap();
+        let mut list = vec![
+            sample_project("u-old", false, t1),
+            sample_project("p-b", true, t2),
+            sample_project("u-new", false, t3),
+            sample_project("p-a", true, t1),
+        ];
+        apply_project_pin_partition(&mut list);
+        let ids: Vec<&str> = list.iter().map(|p| p.id.as_str()).collect();
+        // Relative order within each group preserved (not last_opened).
+        assert_eq!(ids, vec!["p-b", "p-a", "u-old", "u-new"]);
+    }
+
+    #[test]
+    fn reorder_projects_by_ids_clamps_unpinned_below_pinned() {
+        let t = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let list = vec![
+            sample_project("p1", true, t),
+            sample_project("p2", true, t),
+            sample_project("u1", false, t),
+            sample_project("u2", false, t),
+        ];
+        // Client tries to put unpinned above pinned — host pin-partitions back.
+        let ordered = ["u2", "p2", "u1", "p1"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let next = reorder_projects_by_ids(&list, &ordered);
+        let ids: Vec<&str> = next.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, vec!["p2", "p1", "u2", "u1"]);
+    }
+
+    #[test]
+    fn reorder_projects_by_ids_reorders_within_groups() {
+        let t = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let list = vec![
+            sample_project("p1", true, t),
+            sample_project("p2", true, t),
+            sample_project("u1", false, t),
+            sample_project("u2", false, t),
+        ];
+        let ordered = ["p2", "p1", "u2", "u1"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let next = reorder_projects_by_ids(&list, &ordered);
+        let ids: Vec<&str> = next.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, vec!["p2", "p1", "u2", "u1"]);
+    }
+
+    #[test]
+    fn set_project_pinned_moves_to_group_end() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-pin-order-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+        let t = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let seed = vec![
+            sample_project("p1", true, t),
+            sample_project("u1", false, t),
+            sample_project("u2", false, t),
+        ];
+        write_json(&projects_file(), &seed).expect("seed");
+        set_project_pinned("u1", true).expect("pin");
+        let listed = load_projects();
+        let ids: Vec<&str> = listed.iter().map(|p| p.id.as_str()).collect();
+        // u1 becomes pinned and lands at end of pinned group.
+        assert_eq!(ids, vec!["p1", "u1", "u2"]);
+        set_project_pinned("p1", false).expect("unpin");
+        let listed2 = load_projects();
+        let ids2: Vec<&str> = listed2.iter().map(|p| p.id.as_str()).collect();
+        // p1 unpinned → end of unpinned group.
+        assert_eq!(ids2, vec!["u1", "u2", "p1"]);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn session_meta_pinned_defaults_false_on_deserialize() {
+        let raw = r#"{
+            "id":"x","title":"t","createdAt":"2024-01-01T00:00:00Z",
+            "updatedAt":"2024-01-01T00:00:00Z"
+        }"#;
+        let m: SessionMeta = serde_json::from_str(raw).expect("deserialize legacy session");
+        assert!(!m.pinned);
+        assert!(!m.archived);
+    }
+
+    #[test]
+    fn model_stays_per_session_under_global_scope() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-model-scope-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let a = create_session(None, Some("a".into()), false).expect("create a");
+        let b = create_session(None, Some("b".into()), false).expect("create b");
+        save_composer_prefs(
+            None,
+            Some(&a.id),
+            Some("deepseek-v4-flash".into()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("a model");
+        save_composer_prefs(
+            None,
+            Some(&b.id),
+            Some("grok-4.7".into()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("b model");
+
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&a.id)).model_id,
+            "deepseek-v4-flash"
+        );
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&b.id)).model_id,
+            "grok-4.7"
+        );
+        // Neither pick rewrote the seed used by a chat that never chose.
+        assert_eq!(load_settings().model_id.as_deref(), Some("grok-4.7"));
+        let fresh = create_session(None, Some("fresh".into()), false).expect("fresh");
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&fresh.id)).model_id,
+            "grok-4.7"
+        );
+
+        let _ = delete_session(&a.id);
+        let _ = delete_session(&b.id);
+        let _ = delete_session(&fresh.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn provider_stays_per_session_under_global_scope() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-provider-scope-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let a = create_session(None, Some("a".into()), false).expect("create a");
+        let b = create_session(None, Some("b".into()), false).expect("create b");
+        save_composer_prefs(
+            None,
+            Some(&a.id),
+            Some("deepseek-v4-flash".into()),
+            None,
+            None,
+            None,
+            Some("yunyi".into()),
+        )
+        .expect("a provider");
+        save_composer_prefs(
+            None,
+            Some(&b.id),
+            Some("grok-4.7".into()),
+            None,
+            None,
+            None,
+            Some("official".into()),
+        )
+        .expect("b provider");
+
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&a.id))
+                .provider_id
+                .as_deref(),
+            Some("yunyi")
+        );
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&b.id))
+                .provider_id
+                .as_deref(),
+            Some("official")
+        );
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&a.id)).model_id,
+            "deepseek-v4-flash"
+        );
+        // A chat that never picked still has no provider and follows the global route.
+        let fresh = create_session(None, Some("fresh".into()), false).expect("fresh");
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&fresh.id)).provider_id,
+            None
+        );
+        // A draft pick does not write a row and does not retarget an existing chat.
+        save_composer_prefs(
+            None,
+            None,
+            Some("grok-4.7".into()),
+            None,
+            None,
+            None,
+            Some("other".into()),
+        )
+        .expect("draft");
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&b.id))
+                .provider_id
+                .as_deref(),
+            Some("official")
+        );
+
+        let _ = delete_session(&a.id);
+        let _ = delete_session(&b.id);
+        let _ = delete_session(&fresh.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn effort_stays_per_session_under_global_scope() {
+        // Effort is a per-chat decision even when model/mode memory is global:
+        // raising it in one chat used to rewrite `settings.effort` and therefore
+        // every other chat that had already picked its own.
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-effort-scope-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let a = create_session(None, Some("a".into()), false).expect("create a");
+        let b = create_session(None, Some("b".into()), false).expect("create b");
+        save_composer_prefs(
+            None,
+            Some(&a.id),
+            None,
+            Some("low".into()),
+            None,
+            None,
+            None,
+        )
+        .expect("a low");
+        save_composer_prefs(
+            None,
+            Some(&b.id),
+            None,
+            Some("max".into()),
+            None,
+            None,
+            None,
+        )
+        .expect("b max");
+
+        assert_eq!(resolve_composer_prefs(None, Some(&a.id)).effort, "low");
+        assert_eq!(resolve_composer_prefs(None, Some(&b.id)).effort, "max");
+        // The global seed for future chats is left untouched by a per-chat change.
+        assert_eq!(load_settings().effort.as_deref(), Some("xhigh"));
+
+        let _ = delete_session(&a.id);
+        let _ = delete_session(&b.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn draft_effort_seeds_global_without_touching_existing_sessions() {
+        // A draft chat has no row yet, so its effort seeds the default for the
+        // next chat — it must not leak into a chat that already chose one.
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-effort-draft-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let existing = create_session(None, Some("kept".into()), false).expect("create");
+        save_composer_prefs(
+            None,
+            Some(&existing.id),
+            None,
+            Some("max".into()),
+            None,
+            None,
+            None,
+        )
+        .expect("existing max");
+
+        save_composer_prefs(None, None, None, Some("low".into()), None, None, None)
+            .expect("draft low");
+
+        assert_eq!(
+            resolve_composer_prefs(None, Some(&existing.id)).effort,
+            "max",
+            "an existing chat keeps its own effort"
+        );
+        assert_eq!(load_settings().effort.as_deref(), Some("low"));
+        // A brand-new chat inherits the seed.
+        assert_eq!(resolve_composer_prefs(None, None).effort, "low");
+
+        let _ = delete_session(&existing.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn sessions_index_transaction_preserves_concurrent_mutations() {
+        let _env = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-store-index-rmw-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut workers = Vec::new();
+        for n in 0..8 {
+            workers.push(thread::spawn(move || {
+                let id = format!("concurrent-session-{n}");
+                update_sessions_index(move |list| {
+                    list.push(sample_session(&id, false, Utc::now()));
+                    Ok(())
+                })
+                .expect("atomic index mutation");
+            }));
+        }
+        for worker in workers {
+            worker.join().expect("worker panicked");
+        }
+
+        let ids: std::collections::HashSet<String> = load_sessions_index()
+            .into_iter()
+            .map(|session| session.id)
+            .collect();
+        for n in 0..8 {
+            assert!(ids.contains(&format!("concurrent-session-{n}")));
+        }
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn sessions_index_mutation_error_does_not_commit_partial_changes() {
+        let _env = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-store-index-error-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+        let original = sample_session("original", false, Utc::now());
+        update_sessions_index({
+            let original = original.clone();
+            move |list| {
+                list.push(original);
+                Ok(())
+            }
+        })
+        .expect("seed index");
+
+        let err = update_sessions_index(|list| {
+            list.push(sample_session("partial", false, Utc::now()));
+            Err::<(), _>("abort before commit".into())
+        });
+        assert!(err.is_err());
+        let ids: Vec<String> = load_sessions_index()
+            .into_iter()
+            .map(|session| session.id)
+            .collect();
+        assert_eq!(ids, vec!["original"]);
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn merged_message_save_keeps_concurrent_append_and_replace_truncates() {
+        let _env = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-store-journal-rmw-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let session = create_session(None, Some("journal race".into()), false).expect("session");
+        let at = Utc::now();
+        let base = ChatMessageStored {
+            id: "user-1".into(),
+            role: "user".into(),
+            content: "prompt".into(),
+            thought: None,
+            created_at: at,
+            is_error: false,
+            attachments: None,
+            marker: None,
+        };
+        let appended = ChatMessageStored {
+            id: "assistant-1".into(),
+            role: "assistant".into(),
+            content: "stream tail".into(),
+            thought: None,
+            created_at: at + chrono::Duration::milliseconds(1),
+            is_error: false,
+            attachments: None,
+            marker: None,
+        };
+
+        // `base` models a snapshot taken before the stream append.
+        append_message(&session.id, appended.clone()).expect("append stream row");
+        save_messages(&session.id, std::slice::from_ref(&base)).expect("merge stale snapshot");
+        let merged = load_messages(&session.id);
+        assert!(merged.iter().any(|message| message.id == base.id));
+        assert!(merged
+            .iter()
+            .any(|message| message.id == appended.id && message.content == "stream tail"));
+
+        // Rewind-style operations must opt into destructive replacement.
+        replace_messages(&session.id, &[base]).expect("replace truncated journal");
+        let truncated = load_messages(&session.id);
+        assert_eq!(truncated.len(), 1);
+        assert_eq!(truncated[0].id, "user-1");
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn journal_writes_compact_json() {
+        let _env = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-store-journal-compact-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let session = create_session(None, Some("compact journal".into()), false).expect("session");
+        let row = stored_msg("u1", "user", "hello", None);
+        save_messages(&session.id, std::slice::from_ref(&row)).expect("save");
+        let path = session_dir(&session.id).join("messages.json");
+        let raw = fs::read_to_string(&path).expect("read journal");
+        assert!(raw.starts_with('['), "journal is a JSON array");
+        assert!(!raw.contains("\n  "), "pretty indent must not appear");
+        let parsed: Vec<ChatMessageStored> =
+            serde_json::from_str(&raw).expect("compact journal parses");
+        assert_eq!(parsed[0].id, "u1");
+
+        fs::write(&path, serde_json::to_string_pretty(&[row]).unwrap()).unwrap();
+        let loaded = load_messages(&session.id);
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].id, "u1");
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    fn stored_msg(id: &str, role: &str, content: &str, marker: Option<&str>) -> ChatMessageStored {
+        ChatMessageStored {
+            id: id.into(),
+            role: role.into(),
+            content: content.into(),
+            thought: None,
+            created_at: Utc::now(),
+            is_error: false,
+            attachments: None,
+            marker: marker.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn user_prompt_count_skips_interjections() {
+        let msgs = vec![
+            stored_msg("u1", "user", "start the lookbook", None),
+            stored_msg("a1", "assistant", "ok", None),
+            stored_msg("u2", "user", "begin", None),
+            stored_msg("a2", "assistant", "running", None),
+            stored_msg("s1", "user", "还没好吗", Some("interjection")),
+            stored_msg("s2", "user", "？", Some("interjection")),
+            stored_msg("u3", "user", "做的怎么样了", None),
+        ];
+        assert_eq!(user_prompt_count(&msgs), 3);
+        assert_eq!(drop_last_user_prompt_exec_index(3), Some(1));
+        assert_eq!(cut_index_before_last_user_prompt(&msgs), 6);
+        let kept = &msgs[..cut_index_before_last_user_prompt(&msgs)];
+        assert_eq!(kept.last().map(|m| m.id.as_str()), Some("s2"));
+        assert_eq!(user_prompt_count(kept), 2);
+    }
+
+    #[test]
+    fn drop_last_exec_index_edges() {
+        assert_eq!(drop_last_user_prompt_exec_index(0), None);
+        assert_eq!(drop_last_user_prompt_exec_index(1), Some(0));
+        assert_eq!(drop_last_user_prompt_exec_index(2), Some(0));
+    }
+
+    #[test]
+    fn map_host_rewind_index_skips_bootstrap_only_turns() {
+        // Combined bootstrap: 3 old host turns + 2 post-restart prompts (agent has 2).
+        assert_eq!(map_host_rewind_index_to_agent(3, 5, 2), Some(0));
+        assert_eq!(map_host_rewind_index_to_agent(4, 5, 2), Some(1));
+        assert_eq!(map_host_rewind_index_to_agent(2, 5, 2), None);
+        assert_eq!(map_host_rewind_index_to_agent(3, 5, 5), Some(3));
+        assert_eq!(map_host_rewind_index_to_agent(0, 1, 1), Some(0));
+        assert_eq!(map_host_rewind_index_to_agent(1, 2, 0), None);
+    }
+
+    #[test]
+    fn parse_agent_rewind_have_count() {
+        assert_eq!(
+            parse_agent_prompt_count_from_rewind_error(
+                "user prompt index out of range: 3 (have 2)"
+            ),
+            Some(2)
+        );
+        assert_eq!(
+            parse_agent_prompt_count_from_rewind_error("method not found"),
+            None
+        );
+    }
+
+    #[test]
+    fn drop_last_keeps_journal_when_agent_rewind_fails() {
+        assert!(drop_last_should_truncate_journal(None));
+        assert!(drop_last_should_truncate_journal(Some(true)));
+        assert!(!drop_last_should_truncate_journal(Some(false)));
+    }
+
+    #[test]
+    fn set_session_project_keeps_agent_id_for_fork_restore() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-set-project-keep-agent-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("proj");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let proj = add_project(folder.to_string_lossy().to_string(), true).expect("add");
+        let mut meta = create_session(None, Some("fork".into()), false).expect("create");
+        meta.agent_session_id = Some("source-agent".into());
+        meta.fork_agent_session = true;
+        update_session_meta(&meta).expect("seed");
+
+        let bound = set_session_project(&meta.id, Some(proj.id.clone())).expect("bind");
+        assert_eq!(bound.project_id.as_deref(), Some(proj.id.as_str()));
+        assert_eq!(bound.agent_session_id.as_deref(), Some("source-agent"));
+        assert!(bound.fork_agent_session);
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn move_session_to_project_clears_agent_and_worktree() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-move-session-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("proj");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let proj = add_project(folder.to_string_lossy().to_string(), true).expect("add");
+
+        let mut meta = create_session(None, Some("move me".into()), false).expect("create");
+        meta.agent_session_id = Some("agent-old".into());
+        meta.fork_agent_session = true;
+        meta.worktree_path = Some("/tmp/wt".into());
+        meta.worktree_branch = Some("feat".into());
+        meta.is_worktree_session = true;
+        update_session_meta(&meta).expect("seed");
+
+        let moved = move_session_to_project(&meta.id, Some(proj.id.clone())).expect("move");
+        assert_eq!(moved.project_id.as_deref(), Some(proj.id.as_str()));
+        assert!(moved.agent_session_id.is_none());
+        assert!(!moved.fork_agent_session);
+        assert!(moved.worktree_path.is_none());
+        assert!(moved.worktree_branch.is_none());
+        assert!(!moved.is_worktree_session);
+
+        let same = move_session_to_project(&meta.id, Some(proj.id.clone())).expect("noop");
+        assert_eq!(same.project_id.as_deref(), Some(proj.id.as_str()));
+
+        let back = move_session_to_project(&meta.id, None).expect("orphan");
+        assert!(back.project_id.is_none());
+        assert!(back.agent_session_id.is_none());
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn precheck_session_move_validates_before_any_write() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-move-precheck-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("proj");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let proj = add_project(folder.to_string_lossy().to_string(), true).expect("add");
+        let unsafe_folder = tmp.join("unsafe");
+        fs::create_dir_all(&unsafe_folder).expect("unsafe dir");
+        let untrusted =
+            add_project(unsafe_folder.to_string_lossy().to_string(), false).expect("untrusted");
+        let meta = create_session(None, Some("x".into()), false).expect("create");
+
+        // Refusals surface without a session write (command kills the agent
+        // only after this passes).
+        let err = precheck_session_move(&meta.id, Some(untrusted.id.clone()))
+            .expect_err("untrusted refused");
+        assert!(err.contains("session_move_untrusted"), "got {err}");
+        let err =
+            precheck_session_move(&meta.id, Some("nope".into())).expect_err("unknown refused");
+        assert!(err.contains("session_move_not_found"), "got {err}");
+        let err = precheck_session_move("missing-session", Some(proj.id.clone()))
+            .expect_err("unknown session");
+        assert!(err.contains("session not found"), "got {err}");
+
+        // Orphan → orphan is a no-op; orphan → project changes cwd.
+        assert!(
+            !precheck_session_move(&meta.id, None)
+                .expect("noop")
+                .cwd_changes
+        );
+        assert!(
+            precheck_session_move(&meta.id, Some(proj.id.clone()))
+                .expect("move")
+                .cwd_changes
+        );
+        let moved = move_session_to_project(&meta.id, Some(proj.id.clone())).expect("apply");
+        assert_eq!(moved.project_id.as_deref(), Some(proj.id.as_str()));
+        assert!(
+            !precheck_session_move(&meta.id, Some(proj.id.clone()))
+                .expect("same project")
+                .cwd_changes
+        );
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn move_session_to_project_refuses_untrusted_and_missing() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-move-refuse-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let folder = tmp.join("unsafe");
+        fs::create_dir_all(&folder).expect("proj dir");
+        let untrusted =
+            add_project(folder.to_string_lossy().to_string(), false).expect("add untrusted");
+        let meta = create_session(None, Some("x".into()), false).expect("create");
+
+        let err =
+            move_session_to_project(&meta.id, Some(untrusted.id.clone())).expect_err("untrusted");
+        assert!(err.contains("session_move_untrusted"), "got {err}");
+
+        let missing_folder = tmp.join("gone");
+        fs::create_dir_all(&missing_folder).expect("gone dir");
+        let missing =
+            add_project(missing_folder.to_string_lossy().to_string(), true).expect("add missing");
+        let _ = fs::remove_dir_all(&missing_folder);
+        let err = move_session_to_project(&meta.id, Some(missing.id)).expect_err("missing");
+        assert!(err.contains("session_move_path_missing"), "got {err}");
+
+        let err = move_session_to_project(&meta.id, Some("nope".into())).expect_err("missing id");
+        assert!(
+            err.contains("session_move_not_found") || err.contains("project not found"),
+            "got {err}"
+        );
+
+        let _ = delete_session(&meta.id);
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn infer_ssh_alias_from_add_ssh_name() {
+        assert_eq!(
+            infer_ssh_alias_from_name("UTS:2026-07-25-ICLR", "/data/pengqlu/code/2026-07-25-ICLR",),
+            Some("UTS".into())
+        );
+        assert_eq!(
+            infer_ssh_alias_from_name("UTS:pengqlu", "/home/pengqlu"),
+            Some("UTS".into())
+        );
+        assert_eq!(
+            infer_ssh_alias_from_name("UTS:other", "/data/pengqlu/code/2026-07-25-ICLR"),
+            None
+        );
+        assert_eq!(infer_ssh_alias_from_name("UTS:foo", "foo"), None);
+        assert_eq!(infer_ssh_alias_from_name("*:foo", "/data/foo"), None);
+    }
+
+    #[test]
+    fn load_projects_repairs_ssh_alias_and_merges_duplicates() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-ssh-repair-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let older = Utc.with_ymd_and_hms(2026, 8, 24, 11, 0, 0).unwrap();
+        let newer = Utc.with_ymd_and_hms(2026, 8, 24, 12, 0, 0).unwrap();
+        let remote = "/data/pengqlu/code/2026-07-25-ICLR";
+        let mut stale = sample_project("stale-ssh", false, older);
+        stale.name = "UTS:2026-07-25-ICLR".into();
+        stale.path = remote.into();
+        stale.path_ok = false;
+        stale.ssh_alias = None;
+        let mut good = sample_project("good-ssh", false, newer);
+        good.name = "UTS:2026-07-25-ICLR".into();
+        good.path = remote.into();
+        good.path_ok = true;
+        good.ssh_alias = Some("UTS".into());
+        write_json(&projects_file(), &vec![stale.clone(), good.clone()]).expect("seed");
+
+        let mut sess = sample_session("bound-stale", false, older);
+        sess.project_id = Some(stale.id.clone());
+        write_json(&sessions_index_file(), &vec![sess]).expect("seed sessions");
+
+        let listed = load_projects();
+        let hits: Vec<&Project> = listed.iter().filter(|p| p.path == remote).collect();
+        assert_eq!(hits.len(), 1, "duplicate remote folders merged");
+        assert_eq!(hits[0].ssh_alias.as_deref(), Some("UTS"));
+        assert!(hits[0].path_ok, "remote path is not local-missing");
+        assert_eq!(hits[0].id, good.id);
+
+        let reloaded = load_sessions_index();
+        let hit = reloaded
+            .iter()
+            .find(|s| s.id == "bound-stale")
+            .expect("sess");
+        assert_eq!(hit.project_id.as_deref(), Some(good.id.as_str()));
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn add_ssh_project_rebinds_same_path_without_alias() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-ssh-rebind-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut orphan = sample_project("orphan-ssh", false, Utc::now());
+        orphan.name = "my remote".into();
+        orphan.path = "/data/pengqlu/work".into();
+        orphan.path_ok = false;
+        orphan.ssh_alias = None;
+        write_json(&projects_file(), &vec![orphan.clone()]).expect("seed");
+
+        let added = add_ssh_project("UTS", "/data/pengqlu/work".into(), true).expect("add");
+        assert_eq!(added.id, orphan.id);
+        assert_eq!(added.ssh_alias.as_deref(), Some("UTS"));
+        assert!(added.path_ok);
+        let listed = load_projects();
+        assert_eq!(
+            listed
+                .iter()
+                .filter(|p| p.path == "/data/pengqlu/work")
+                .count(),
+            1
+        );
+
+        std::env::remove_var("GROK_APP_HOME");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn connect_writeback_keeps_provider_and_model_saved_during_handshake() {
+        let _g = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let tmp = std::env::temp_dir().join(format!(
+            "grok-app-meta-preserve-{}-{}",
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).expect("tmp home");
+        let previous = std::env::var_os("GROK_APP_HOME");
+        std::env::set_var("GROK_APP_HOME", &tmp);
+        let _ = ensure_app_dirs();
+
+        let mut snap = create_session(None, Some("chat".into()), false).expect("session");
+        snap.agent_session_id = Some("old-agent".into());
+        update_session_meta(&snap).expect("seed agent id");
+        save_composer_prefs(
+            None,
+            Some(&snap.id),
+            Some("deepseek-v4-flash".into()),
+            None,
+            None,
+            None,
+            Some("relay-b".into()),
+        )
+        .expect("in-flight composer save");
+
+        // Handshake still holds the entry snapshot, plus the agent id it just opened.
+        snap.agent_session_id = Some("spawned-agent".into());
+        snap.provider_id = None;
+        snap.model_id = Some("grok-4.7".into());
+        snap.effort = Some("high".into());
+        let written = update_session_meta_preserving_composer(&snap).expect("writeback");
+        assert_eq!(written.provider_id.as_deref(), Some("relay-b"));
+        assert_eq!(written.model_id.as_deref(), Some("deepseek-v4-flash"));
+        assert_eq!(written.agent_session_id.as_deref(), Some("spawned-agent"));
+        assert_eq!(written.effort.as_deref(), Some("high"));
+
+        let row = load_sessions_index()
+            .into_iter()
+            .find(|s| s.id == snap.id)
+            .expect("row");
+        assert_eq!(row.provider_id.as_deref(), Some("relay-b"));
+        assert_eq!(row.model_id.as_deref(), Some("deepseek-v4-flash"));
+        assert_eq!(row.agent_session_id.as_deref(), Some("spawned-agent"));
+
+        match previous {
+            Some(value) => std::env::set_var("GROK_APP_HOME", value),
+            None => std::env::remove_var("GROK_APP_HOME"),
+        }
+        let _ = fs::remove_dir_all(&tmp);
+    }
+}

@@ -1,0 +1,453 @@
+/* lobe-chat css chunk */
+
+.lobe-turn-activity--error {
+  border-top-color: color-mix(in srgb, var(--chat-border, #888) 28%, transparent);
+}
+.lobe-turn-activity__trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--chat-text-2);
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.lobe-turn-activity__trigger:hover {
+  color: var(--chat-text);
+}
+.lobe-turn-activity__chev {
+  display: inline-flex;
+  color: var(--chat-text-3);
+}
+.lobe-turn-activity__title {
+  font-weight: 500;
+}
+.lobe-turn-activity__list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 4px;
+}
+.lobe-turn-activity__seg {
+  margin: 2px 0;
+}
+.lobe-turn-activity__tool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 1px 0;
+  min-height: 22px;
+}
+.lobe-turn-activity__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chat-text-3);
+  flex-shrink: 0;
+}
+.lobe-turn-activity__dot.is-error {
+  background: var(--chat-danger, #e11);
+}
+.lobe-turn-activity__dot.is-running {
+  background: var(--chat-link);
+  animation: chat-live-pulse 1.2s ease-in-out infinite;
+}
+.lobe-turn-activity__tool-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: min(100%, 36rem);
+  color: var(--chat-text-2);
+}
+.lobe-turn-activity__tool-name.is-error {
+  color: var(--chat-danger, #c44);
+}
+.lobe-turn-activity__fail-hint {
+  flex: 1 1 100%;
+  margin: 0 0 0 14px;
+  padding: 0;
+  color: var(--chat-text-3);
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  /* No dark code block — quiet secondary line only */
+  background: transparent;
+  border: none;
+}
+.lobe-turn-activity__ctx-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--chat-text-2);
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.lobe-turn-activity__sub {
+  list-style: none;
+  margin: 0 0 0 12px;
+  padding: 0 0 0 8px;
+  border-left: 2px solid color-mix(in srgb, var(--chat-border, #888) 40%, transparent);
+}
+.lobe-turn-activity__files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  align-items: center;
+}
+.lobe-turn-activity__files-btn,
+.lobe-turn-activity__file {
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--chat-border, #888) 50%, transparent);
+  background: transparent;
+  color: var(--chat-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.lobe-turn-activity__files-btn:hover,
+.lobe-turn-activity__file:hover {
+  color: var(--chat-text);
+  border-color: var(--chat-text-3);
+}
+
+/* ── Mid-stream tool text (plain one line under reply, replace-only) ── */
+.lobe-chat-tool-text {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 10px 0 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--chat-text-3, var(--lobe-color-text-tertiary, #8e8e93));
+  font-size: var(--chat-fs-sm, 13px);
+  font-weight: 400;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* End-of-turn chip — quiet chrome metrics (20px row, 14px mark, fs-sm) */
+.lobe-end-turn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 2px 0 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--chat-text-3, #6e6e73);
+  font-size: var(--chat-fs-sm);
+  line-height: 1.35;
+  min-height: 20px;
+}
+.lobe-end-turn__mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  line-height: 0;
+  color: currentColor;
+}
+/* Collapse wrap() size so SVG fills the 14×14 end-turn mark slot. */
+.lobe-end-turn__mark .g-icon {
+  width: 14px !important;
+  height: 14px !important;
+  line-height: 0 !important;
+}
+.lobe-end-turn__mark .g-icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+/*
+ * Solid stop square (user stop / cancelled).
+ * CSS glyph avoids Tabler viewBox padding that mis-centers at sm size.
+ * Cap-height-ish vs 12.5px text: 8px in a 14px slot → true vertical center.
+ */
+.lobe-end-turn__stop {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 1.5px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.lobe-end-turn__title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: currentColor;
+  font-weight: 400;
+  font-size: inherit;
+  line-height: inherit;
+}
+.lobe-end-turn--warning {
+  color: color-mix(
+    in srgb,
+    var(--chat-warning, #c90) 75%,
+    var(--chat-text-3, #6e6e73)
+  );
+}
+.lobe-end-turn--error {
+  color: var(--chat-danger, #e55);
+}
+.lobe-end-turn--neutral {
+  color: var(--chat-text-3, #6e6e73);
+}
+.lobe-end-turn__continue {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.lobe-end-turn__continue:disabled {
+  opacity: 0.45;
+  cursor: default;
+  text-decoration: none;
+}
+.lobe-end-turn__continue:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Legacy class kept for any residual markers */
+.lobe-chat-tool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: var(--chat-fs-sm);
+  color: var(--chat-text-2);
+}
+
+/* ── Context compact marker (auto or /compact) ── */
+.lobe-chat-compact {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--chat-r);
+  border: 1px solid var(--chat-border, var(--border-subtle, rgba(255, 255, 255, 0.08)));
+  background: color-mix(in srgb, var(--chat-text-3, #6e6e73) 12%, transparent);
+  color: var(--chat-text-2);
+  /* Long compact notes / shell one-liners must not widen the chat column (#537). */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.lobe-chat-compact__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--chat-text-3);
+}
+.lobe-chat-compact__body {
+  min-width: 0;
+  flex: 1;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.lobe-chat-compact__title {
+  font-size: var(--chat-fs-sm);
+  font-weight: 560;
+  color: var(--chat-text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.lobe-chat-compact__detail {
+  margin-top: 2px;
+  font-size: var(--chat-fs-xs);
+  color: var(--chat-text-3);
+  font-variant-numeric: tabular-nums;
+  /* Compact note often contains long paths / CLI flags with few spaces. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+.lobe-chat-compact__summary {
+  margin-top: 6px;
+  font-size: var(--chat-fs-xs);
+  color: var(--chat-text-3);
+  max-width: 100%;
+}
+.lobe-chat-compact__summary summary {
+  cursor: pointer;
+  user-select: none;
+  color: var(--chat-text-2);
+}
+.lobe-chat-compact__summary p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: var(--chat-lh-sm);
+  color: var(--chat-text-2);
+  max-width: 100%;
+}
+
+/* ── Turn notice (Codex-style soft pill — not a red alert box) ── */
+.lobe-chat-error {
+  width: 100%;
+  max-width: min(100%, 40rem);
+  box-sizing: border-box;
+  padding: 4px 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--chat-text-2, var(--text-secondary));
+}
+
+.lobe-chat-error__pill {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--chat-text, #fff) 10%, transparent);
+  background: color-mix(in srgb, var(--chat-text, #fff) 7%, transparent);
+  color: var(--chat-text-2, var(--text-secondary, #a1a1aa));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.lobe-chat-error__icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--chat-text-2, var(--text-secondary));
+  opacity: 0.85;
+  border: 1px solid color-mix(in srgb, var(--chat-text, #fff) 18%, transparent);
+}
+
+.lobe-chat-error__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.lobe-chat-error__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  margin-top: -2px;
+  margin-inline-end: -4px;
+  opacity: 0.85;
+}
+
+/* Legacy label kept for find-hit styles; no longer painted red. */
+.lobe-chat-error__label {
+  display: none;
+}
+
+.lobe-chat-error__body {
+  display: none;
+}
+
+/* ── Empty ── */
+.lobe-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 36vh;
+  padding: 40px 20px;
+  text-align: center;
+  gap: 6px;
+}
+/* Welcome state: no copy, no vertical claim (logo + composer are centered) */
+.lobe-chat-empty--spacer {
+  min-height: 0;
+  padding: 0;
+  flex: 0 0 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.lobe-chat-empty__spinner {
+  margin-bottom: 10px;
+  color: var(--chat-text-3);
+}
+.lobe-chat-empty__title {
+  margin: 0;
+  font-size: var(--chat-fs);
+  font-weight: 500;
+  color: var(--chat-text);
+}
+.lobe-chat-empty__desc {
+  margin: 0;
+  max-width: 28rem;
+  font-size: var(--chat-fs-sm);
+  color: var(--chat-text-3);
+  line-height: var(--chat-lh-sm);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lobe-chat-empty[data-kind="loading"] .lobe-chat-empty__title {
+    animation: lobe-chat-empty-pulse 1.2s ease-in-out infinite;
+  }
+}
+@keyframes lobe-chat-empty-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ── Back bottom ──
+ * Sit above the floating composer (App sets --composer-float-pad from
+ * measured shell height). Centered so narrow panes don't overlap the
+ * composer card / side controls.
+ */
+

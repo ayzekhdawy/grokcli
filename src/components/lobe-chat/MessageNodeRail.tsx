@@ -1,0 +1,399 @@
+/**
+ * Message node rail — Codex-style growing ticks on the left or right
+ * (`data-msg-rail-side`). One tick per user/assistant message; hover preview;
+ * prev/next steppers.
+ *
+ * Active highlight is owned here during free scroll (rAF-throttled
+ * querySelectorAll) so ConversationThread does not setState on every scroll
+ * frame — that was a multi-turn jank source (#280). Parent only mirrors the
+ * free-scroll cursor via `onScrollActiveChange` (ref update, no setState).
+ */
+
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
+import { IconChevronDown, IconChevronUp } from "@/components/icons";
+import type { SessionMessageNode } from "@/lib/sessionMessageNodes";
+import {
+  estimateMessageIndexAtY,
+  nearestNodeIdFromPaintList,
+  pickActiveNodeIdFromRects,
+} from "@/lib/sessionMessageNodes";
+import type { ChatMessage } from "@/lib/session";
+import { cn } from "@/lib/utils";
+import { scrollChildIntoContainer } from "@/lib/grokActivityVirtualize";
+import { scrollPerfDebug } from "@/lib/scrollPerfDebug";
+import {
+  MSG_RAIL_SIDE_CHANGE_EVENT,
+  readMsgRailSideFromDocument,
+  type MsgRailSide,
+} from "@/lib/msgRailSidePref";
+
+export type MessageNodeRailLabels = {
+  aria: string;
+  prev: string;
+  next: string;
+  userRole: string;
+  assistantRole: string;
+  /** "{current} / {total}" */
+  count: (current: number, total: number) => string;
+};
+
+type TipState = {
+  node: SessionMessageNode;
+  top: number;
+  left?: number;
+  right?: number;
+};
+
+/** Hide the rail when the centered column leaves < 48px on the chosen side. */
+const MSG_RAIL_MIN_GUTTER_PX = 48;
+
+export function MessageNodeRail({
+  nodes,
+  activeId,
+  onSelect,
+  onPrev,
+  onNext,
+  labels,
+  scrollParentRef,
+  /**
+   * Paint list (filtered transcript) for height-estimate fallback when rows
+   * are virtualized away. Must match the virtualizer item list — not the full
+   * journal — or free-scroll highlight drifts past hidden tool rows.
+   */
+  messages,
+  /** When performance.now() < this ref value, ignore scroll-driven highlight. */
+  navLockUntilRef,
+  /**
+   * Free-scroll cursor sync (ref-only on the parent). Called when the rail
+   * picks a new active node so prev/next step from the reading position.
+   */
+  onScrollActiveChange,
+}: {
+  nodes: readonly SessionMessageNode[];
+  /** Programmatic cursor seed (prev/next / click) — mirrored into local state. */
+  activeId: string | null;
+  onSelect: (node: SessionMessageNode) => void;
+  onPrev: () => void;
+  onNext: () => void;
+  labels: MessageNodeRailLabels;
+  scrollParentRef?: RefObject<HTMLElement | null>;
+  messages?: readonly ChatMessage[];
+  navLockUntilRef?: RefObject<number>;
+  onScrollActiveChange?: (id: string) => void;
+}) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [tip, setTip] = useState<TipState | null>(null);
+  /**
+   * Scroll-derived highlight owns the display after free scroll.
+   * Programmatic activeId only seeds this state (see effect below) so a
+   * stale parent activeId cannot pin the rail after the user has scrolled.
+   */
+  const [scrollActiveId, setScrollActiveId] = useState<string | null>(null);
+  const [hasGutter, setHasGutter] = useState(true);
+  const [hot, setHot] = useState(false);
+  const [side, setSide] = useState<MsgRailSide>(() =>
+    readMsgRailSideFromDocument(),
+  );
+  const clusterRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const onScrollActiveChangeRef = useRef(onScrollActiveChange);
+  onScrollActiveChangeRef.current = onScrollActiveChange;
+
+  // Free-scroll / local state first; fall back to programmatic seed.
+  const displayActiveId = scrollActiveId ?? activeId;
+
+  const activeIndex = useMemo(() => {
+    if (!displayActiveId) return -1;
+    return nodes.findIndex((n) => n.id === displayActiveId);
+  }, [nodes, displayActiveId]);
+
+  const canPrev = activeIndex > 0 || (activeIndex < 0 && nodes.length > 0);
+  const canNext =
+    (activeIndex >= 0 && activeIndex < nodes.length - 1) ||
+    (activeIndex < 0 && nodes.length > 0);
+
+  const nodeIdSet = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes]);
+  const sessionSig = nodes[0]?.id ?? "";
+
+  // Keep the active tick roughly in view inside a long rail.
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return;
+    const list = listRef.current;
+    const tick = list.querySelector(
+      `[data-node-id="${CSS.escape(nodes[activeIndex]!.id)}"]`,
+    ) as HTMLElement | null;
+    if (!tick) return;
+    // Rail list only. scrollIntoView walks the chat scroller and jumps the
+    // transcript when a tick's transformed box sits outside the viewport
+    // during thinking / tool updates.
+    const listBox = list.getBoundingClientRect();
+    const tickBox = tick.getBoundingClientRect();
+    if (tickBox.top < listBox.top || tickBox.bottom > listBox.bottom) {
+      scrollChildIntoContainer(list, tick);
+    }
+  }, [activeIndex, nodes]);
+
+  // Free-scroll highlight: rAF throttle + one querySelectorAll per frame.
+  useEffect(() => {
+    const viewport = scrollParentRef?.current;
+    if (!viewport || nodes.length < 2) return;
+
+    const sync = () => {
+      rafRef.current = null;
+      if (
+        navLockUntilRef &&
+        performance.now() < (navLockUntilRef.current ?? 0)
+      ) {
+        return;
+      }
+      const t0 = performance.now();
+
+      const viewportRect = viewport.getBoundingClientRect();
+      const focusY = viewportRect.top + viewport.clientHeight * 0.28;
+      const scrolling = viewport.dataset.scrolling === "1";
+
+      let bestId: string | null = null;
+      let mountedCount = 0;
+      if (!scrolling) {
+        // Mounted rows beat height estimates — one tall imported assistant
+        // answer otherwise keeps the active tick in the middle of the rail.
+        const mounted =
+          viewport.querySelectorAll<HTMLElement>("[data-message-id]");
+        mountedCount = mounted.length;
+        const rects: { id: string; top: number; bottom: number }[] = [];
+        for (const row of mounted) {
+          const id = row.getAttribute("data-message-id");
+          if (!id || !nodeIdSet.has(id)) continue;
+          const r = row.getBoundingClientRect();
+          if (r.height <= 0) continue;
+          rects.push({ id, top: r.top, bottom: r.bottom });
+        }
+        bestId = pickActiveNodeIdFromRects(rects, focusY);
+      }
+
+      if (!bestId && messages && messages.length > 0) {
+        const y = viewport.scrollTop + viewport.clientHeight * 0.28;
+        const msgIdx = estimateMessageIndexAtY(messages, y);
+        // Id walk on the paint list — not journal messageIndex (filtered lists).
+        bestId = nearestNodeIdFromPaintList(messages, nodes, msgIdx);
+      }
+
+      const syncDuration = performance.now() - t0;
+      scrollPerfDebug.recordNodeRailSyncTime(syncDuration, mountedCount);
+
+      if (bestId) {
+        setScrollActiveId((prev) => {
+          if (prev === bestId) return prev;
+          onScrollActiveChangeRef.current?.(bestId);
+          return bestId;
+        });
+      }
+    };
+
+    const onScroll = () => {
+      if (rafRef.current != null) return;
+      rafRef.current = window.requestAnimationFrame(sync);
+    };
+
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    // Initial paint.
+    rafRef.current = window.requestAnimationFrame(sync);
+
+    return () => {
+      viewport.removeEventListener("scroll", onScroll);
+      if (rafRef.current != null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [scrollParentRef, nodes, nodeIdSet, messages, navLockUntilRef]);
+
+  // When parent sets a programmatic activeId, mirror it into scroll state so
+  // highlight does not snap back on the next free-scroll frame incorrectly.
+  useEffect(() => {
+    if (activeId) {
+      setScrollActiveId(activeId);
+      onScrollActiveChangeRef.current?.(activeId);
+    }
+  }, [activeId]);
+
+  useEffect(() => {
+    const onSide = () => setSide(readMsgRailSideFromDocument());
+    onSide();
+    window.addEventListener(MSG_RAIL_SIDE_CHANGE_EVENT, onSide);
+    return () => window.removeEventListener(MSG_RAIL_SIDE_CHANGE_EVENT, onSide);
+  }, []);
+
+  useEffect(() => {
+    setHot(false);
+    setTip(null);
+  }, [sessionSig]);
+
+  useEffect(() => {
+    const viewport = scrollParentRef?.current;
+    if (!viewport) return;
+    const chat = viewport.closest(".lobe-chat");
+    const inner =
+      viewport.querySelector(".lobe-chat__inner") ??
+      chat?.querySelector(".lobe-chat__inner");
+    if (!(chat instanceof HTMLElement) || !(inner instanceof HTMLElement)) {
+      return;
+    }
+
+    const measure = () => {
+      const cr = chat.getBoundingClientRect();
+      const ir = inner.getBoundingClientRect();
+      const gutter =
+        side === "right" ? cr.right - ir.right : ir.left - cr.left;
+      setHasGutter(gutter >= MSG_RAIL_MIN_GUTTER_PX);
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(chat);
+    ro.observe(inner);
+    measure();
+    return () => ro.disconnect();
+  }, [scrollParentRef, nodes.length, side]);
+
+  const showTipFor = (node: SessionMessageNode, el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const top = r.top + r.height / 2;
+    if (side === "right") {
+      setTip({
+        node,
+        top,
+        right: window.innerWidth - r.left + 8,
+      });
+      return;
+    }
+    setTip({
+      node,
+      top,
+      left: r.right + 8,
+    });
+  };
+
+  const clearTip = (id: string) => {
+    setTip((cur) => (cur?.node.id === id ? null : cur));
+  };
+
+  if (nodes.length < 2 || !hasGutter) return null;
+
+  const tipRole =
+    tip == null
+      ? ""
+      : tip.node.role === "user"
+        ? labels.userRole
+        : labels.assistantRole;
+
+  const onClusterLeave = () => {
+    setHot(false);
+    setTip(null);
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      clusterRef.current?.contains(active)
+    ) {
+      active.blur();
+    }
+  };
+
+  return (
+    <nav
+      className={
+        "lobe-msg-rail" + (hot ? " is-hot" : "")
+      }
+      aria-label={labels.aria}
+      data-slot="message-node-rail"
+    >
+      <div
+        ref={clusterRef}
+        className="lobe-msg-rail__cluster"
+        onPointerEnter={() => setHot(true)}
+        onPointerLeave={onClusterLeave}
+      >
+      <button
+        type="button"
+        className="lobe-msg-rail__chev"
+        aria-label={labels.prev}
+        disabled={!canPrev}
+        tabIndex={hot && canPrev ? 0 : -1}
+        onClick={onPrev}
+      >
+        <IconChevronUp size={14} />
+      </button>
+
+      <div ref={listRef} className="lobe-msg-rail__list" role="list">
+        {nodes.map((n) => {
+          const isActive = n.id === displayActiveId;
+          const isHover = tip?.node.id === n.id;
+          const roleLabel =
+            n.role === "user" ? labels.userRole : labels.assistantRole;
+          // Keep button role; wrap with listitem so a11y trees do not promote
+          // the control to a nameless "group" (Appshot / VoiceOver).
+          return (
+            <div key={n.id} role="listitem" className="lobe-msg-rail__item">
+              <button
+                type="button"
+                data-node-id={n.id}
+                className={cn(
+                  "lobe-msg-rail__tick",
+                  isActive && "is-active",
+                  isHover && "is-hover",
+                  n.status === "error" && "is-error",
+                  n.status === "pending" && "is-pending",
+                )}
+                aria-label={`${roleLabel}: ${n.preview}`}
+                aria-current={isActive ? "true" : undefined}
+                onMouseEnter={(e) => showTipFor(n, e.currentTarget)}
+                onMouseLeave={() => clearTip(n.id)}
+                onFocus={(e) => showTipFor(n, e.currentTarget)}
+                onBlur={() => clearTip(n.id)}
+                onClick={() => onSelect(n)}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        className="lobe-msg-rail__chev"
+        aria-label={labels.next}
+        disabled={!canNext}
+        tabIndex={hot && canNext ? 0 : -1}
+        onClick={onNext}
+      >
+        <IconChevronDown size={14} />
+      </button>
+      </div>
+
+      {tip && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="lobe-msg-rail__tip lobe-msg-rail__tip--portal"
+              role="tooltip"
+              style={{
+                top: tip.top,
+                ...(tip.left != null ? { left: tip.left } : {}),
+                ...(tip.right != null ? { right: tip.right } : {}),
+              }}
+            >
+              <div className="lobe-msg-rail__tip-role">{tipRole}</div>
+              <div className="lobe-msg-rail__tip-body">{tip.node.preview}</div>
+              <div className="lobe-msg-rail__tip-count">
+                {labels.count(tip.node.nodeIndex + 1, nodes.length)}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </nav>
+  );
+}

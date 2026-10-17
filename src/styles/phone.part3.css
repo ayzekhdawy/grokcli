@@ -1,0 +1,813 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+.rim-choice__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong, rgba(255, 255, 255, 0.2));
+  flex-shrink: 0;
+}
+
+.rim-choice.is-on .rim-choice__dot {
+  border-color: var(--accent, #6b9fff);
+  background: radial-gradient(circle at center, var(--accent, #6b9fff) 0 45%, transparent 48%);
+}
+
+.rim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rim-list__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.rim-list li:last-child .rim-list__link { border-bottom: none; }
+.rim-list__link:hover { background: var(--bg-hover); }
+
+.rim-list__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rim-list__meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.rim-callout {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.rim-callout p { margin: 0; }
+
+.rim-callout--warn {
+  border-color: color-mix(in srgb, #ffcc00 35%, var(--border-subtle));
+  background: color-mix(in srgb, #ffcc00 8%, var(--bg-card));
+}
+
+.rim-callout--error {
+  border-color: color-mix(in srgb, #ff3b30 35%, var(--border-subtle));
+  background: color-mix(in srgb, #ff3b30 8%, var(--bg-card));
+  color: var(--text-primary);
+}
+
+.rim-callout--ok {
+  border-color: color-mix(in srgb, #34c759 35%, var(--border-subtle));
+  background: color-mix(in srgb, #34c759 8%, var(--bg-card));
+}
+
+.rim-guide-steps {
+  margin: 0 0 8px;
+  padding-left: 1.25em;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.rim-guide-steps li + li {
+  margin-top: 4px;
+}
+
+.rim-callout__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.rim-guide-steps {
+  margin: 0 0 8px;
+  padding-left: 1.25em;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.rim-guide-steps li + li {
+  margin-top: 4px;
+}
+
+.rim-callout__code {
+  display: block;
+  margin-top: 8px;
+  font-size: 11.5px;
+  word-break: break-all;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-elevated, #1c1c1e) 80%, transparent);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.rim-help-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.rim-help-list code {
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+}
+
+.rim-secret-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.rim-secret-row .settings-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.rim-pair-paste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.rim-pair-paste > .btn {
+  align-self: flex-start;
+}
+
+/* Channel health depth card (Feishu/Lark + Telegram) */
+.rim-health {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rim-health--ok {
+  border-color: color-mix(in srgb, #34c759 40%, var(--border-subtle));
+  background: color-mix(in srgb, #34c759 7%, var(--bg-input));
+}
+
+.rim-health--warn {
+  border-color: color-mix(in srgb, #ffd60a 40%, var(--border-subtle));
+  background: color-mix(in srgb, #ffd60a 7%, var(--bg-input));
+}
+
+.rim-health--err {
+  border-color: color-mix(in srgb, #ff6961 45%, var(--border-subtle));
+  background: color-mix(in srgb, #ff6961 8%, var(--bg-input));
+}
+
+.rim-health__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.rim-health__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rim-health__transport {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rim-health__mode {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.rim-health__facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rim-health__facts li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 12px;
+}
+
+.rim-health__k {
+  color: var(--text-tertiary);
+  min-width: 4.5em;
+}
+
+.rim-health__v {
+  color: var(--text-secondary);
+}
+
+.rim-health__v--warn {
+  color: color-mix(in srgb, #c99100 80%, var(--text-primary));
+}
+
+html[data-theme="dark"] .rim-health__v--warn {
+  color: #ffd60a;
+}
+
+.rim-health__error {
+  margin-top: 2px;
+}
+
+.rim-health__error code {
+  display: block;
+  font-size: 11px;
+  word-break: break-word;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, #ff6961 10%, transparent);
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.rim-health__hints {
+  margin: 2px 0 0;
+  padding: 0 0 0 1.1em;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.rim-health__hints li + li {
+  margin-top: 2px;
+}
+
+/* Resilience honesty notes (rate limit / backoff policy) */
+.rim-resilience-notes {
+  margin-top: 0;
+}
+
+.rim-resilience-notes .rim-help-list {
+  margin: 0.25rem 0 0;
+}
+
+/* Bridge event timeline (local ring) */
+.rim-timeline {
+  padding-bottom: 4px;
+}
+
+.rim-timeline__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+
+.rim-timeline__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  min-width: 0;
+}
+
+.rim-timeline__toggle:hover {
+  color: var(--accent, #6b9fff);
+}
+
+.rim-timeline__chevron {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  width: 1em;
+}
+
+.rim-timeline__title {
+  min-width: 0;
+}
+
+.rim-timeline__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-hover, color-mix(in srgb, var(--text-primary) 8%, transparent));
+}
+
+.rim-timeline__desc {
+  margin: 0 0 8px;
+  padding: 0 2px;
+}
+
+.rim-timeline__empty {
+  margin: 0;
+  padding: 8px 2px 12px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.rim-timeline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.rim-timeline__row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 2px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.rim-timeline__row:first-child {
+  border-top: none;
+}
+
+.rim-timeline__when {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  min-width: 4.5em;
+}
+
+.rim-timeline__label {
+  color: var(--text-secondary);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.rim-timeline__meta {
+  color: var(--text-tertiary);
+}
+
+.rim-timeline__note {
+  color: var(--text-tertiary);
+}
+
+.rim-instance-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.rim-instance-bar .rim-select {
+  min-width: 140px;
+  max-width: 200px;
+  flex: 0 1 auto;
+}
+
+.rim-instance-bar__name {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
+.rim-scan__box {
+  min-height: 168px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  background: var(--bg-input);
+  padding: 16px;
+  text-align: center;
+}
+
+.rim-scan__box.is-waiting,
+.rim-scan__box.is-done {
+  border-style: solid;
+}
+
+.rim-scan__box.is-waiting {
+  border-color: color-mix(in srgb, var(--accent, #6b9fff) 50%, var(--border-subtle));
+}
+
+.rim-scan__box.is-done {
+  border-color: color-mix(in srgb, #34c759 45%, var(--border-subtle));
+  background: color-mix(in srgb, #34c759 8%, var(--bg-input));
+  color: var(--text-primary);
+}
+
+.rim-scan__qr {
+  width: 180px;
+  height: 180px;
+  border-radius: 10px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.rim-scan__uri {
+  max-width: 100%;
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text-secondary);
+}
+
+.rim-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rim-chip {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.rim-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.rim-chip.is-on {
+  border-color: color-mix(in srgb, var(--accent, #6b9fff) 55%, var(--border-subtle));
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent, #6b9fff) 14%, transparent);
+  font-weight: 550;
+}
+
+.rim-collapse {
+  margin-top: 10px;
+}
+
+.rim-collapse__head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rim-collapse__head:hover {
+  background: var(--bg-hover);
+}
+
+.rim-collapse__body {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rim-collapse__body .settings-row:last-child {
+  border-bottom: none;
+}
+
+.rim-doctor {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 12px !important;
+}
+
+.rim-danger {
+  border-color: color-mix(in srgb, #ff3b30 28%, var(--border-subtle));
+}
+
+.rim-required {
+  margin-left: 4px;
+  color: color-mix(in srgb, #ff3b30 85%, var(--text-secondary));
+  font-weight: 700;
+}
+
+.rim-modal__body {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.rim-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+.rim-channel .settings-card,
+.rim-overview .settings-card {
+  margin-bottom: 4px;
+}
+
+.rim-channel .settings-page__h2,
+.rim-overview .settings-page__h2 {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rim-channel .settings-page__h2:first-of-type,
+.rim-overview .settings-page__h2:first-of-type {
+  margin-top: 2px;
+}
+
+.settings-card > .rim-callout {
+  margin: 0 14px 14px;
+}
+
+html[data-theme="light"] .rim-sidebar {
+  background: color-mix(in srgb, var(--bg-sidebar, #f5f5f7) 92%, #fff);
+}
+
+@media (max-width: 780px) {
+  .settings-card--rim,
+  .rim-layout {
+    min-height: 0;
+  }
+  .rim-layout {
+    flex-direction: column;
+  }
+  .rim-sidebar {
+    width: 100%;
+    max-width: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    max-height: 36vh;
+  }
+  .rim-panel {
+    max-height: none;
+  }
+}
+
+/* ── Agent tasks panel (session tool stream) ── */
+.agent-tasks {
+  border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: var(--bg-elevated, var(--bg-panel, transparent));
+  max-height: min(42vh, 360px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.agent-tasks__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 4px;
+}
+.agent-tasks__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.agent-tasks__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.agent-tasks__badge {
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.agent-tasks__head-actions {
+  display: flex;
+  gap: 4px;
+}
+.agent-tasks__snap-note {
+  margin: 0 14px 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.78;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fg, #e8e8e8) 6%, transparent);
+}
+.agent-tasks__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 8px;
+}
+.agent-tasks__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.agent-tasks__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.35));
+  background: transparent;
+  color: var(--text-secondary, inherit);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+  max-width: 140px;
+  overflow: hidden;
+}
+.agent-tasks__chip:hover {
+  background: var(--hover-bg, rgba(127, 127, 127, 0.1));
+  color: var(--text-primary, inherit);
+}
+.agent-tasks__chip.is-active {
+  border-color: color-mix(in srgb, var(--accent, #5b8def) 30%, transparent);
+  background: color-mix(in srgb, var(--accent, #5b8def) 14%, transparent);
+  color: var(--text-primary, inherit);
+  font-weight: 560;
+}
+.agent-tasks__chip-count {
+  font-size: 10px;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.agent-tasks__chip.is-active .agent-tasks__chip-count {
+  opacity: 0.9;
+}
+.agent-tasks__search {
+  padding: 0;
+}
+.agent-tasks__search-input {
+  width: 100%;
+}
+.agent-tasks__body {
+  overflow: auto;
+  padding: 0 8px 10px;
+  min-height: 0;
+}
+.agent-tasks__section-title {
+  margin: 8px 4px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+.agent-tasks__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.agent-tasks__row {
+  border-radius: 8px;
+  margin: 2px 0;
+}
+.agent-tasks__row.is-running {
+  background: color-mix(in srgb, var(--accent, #5b8def) 10%, transparent);
+}
+.agent-tasks__row.is-child {
+  /* Indentation applied via inline paddingLeft; keep marker subtle. */
+  border-left: 1px solid
+    color-mix(in srgb, var(--border-subtle, rgba(127, 127, 127, 0.35)) 80%, transparent);
+}
+.agent-tasks__row-line {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+}
+.agent-tasks__tree-toggle {
+  flex: 0 0 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+}
+.agent-tasks__tree-toggle:hover {
+  opacity: 1;
+  background: var(--hover-bg, rgba(127, 127, 127, 0.1));
+}
+.agent-tasks__tree-spacer {
+  flex: 0 0 22px;
+  width: 22px;
+}
+.agent-tasks__row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px 3px 0;
+  border-radius: 8px;
+  color: inherit;
+}
+/* Flat list (no nesting): restore original row padding. */
+.agent-tasks__row-main--flat {
+  width: 100%;
+  padding: 3px 8px;
+}
+.agent-tasks__row-toggle {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 4px 2px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.agent-tasks__row-toggle:hover {
+  background: var(--hover-bg, rgba(127, 127, 127, 0.1));
+}
+.agent-tasks__row-main--static {
+  /* Activity session rows keep static layout. */
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 7px 8px;
+  cursor: default;
+}
+.agent-tasks__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted, #888);
+}
+.agent-tasks__dot--running {
+  background: var(--accent, #5b8def);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #5b8def) 28%, transparent);
+}
+.agent-tasks__dot--failed {
+  background: var(--danger, #e35d5d);
+}

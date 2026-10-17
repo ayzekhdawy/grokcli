@@ -1,0 +1,136 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Grok",
+  "version": "0.2.41",
+  "identifier": "com.grokapp.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev:ui",
+    "devUrl": "http://localhost:1421",
+    "beforeBuildCommand": "pnpm build:ui",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Grok",
+        "visible": false,
+        "create": false,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "shadow": true,
+        "zoomHotkeysEnabled": true
+      }
+    ],
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: media: http://asset.localhost https://asset.localhost http://media.localhost https://media.localhost asset://localhost media://localhost http://127.0.0.1:* http://localhost:* data: blob: https://pbs.twimg.com https://ton.twimg.com https://abs.twimg.com https://video.twimg.com https:; media-src 'self' asset: media: http://asset.localhost https://asset.localhost http://media.localhost https://media.localhost asset://localhost media://localhost http://127.0.0.1:* http://localhost:* blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost http://127.0.0.1:* http://localhost:* https://api.x.ai https://x.ai https://auth.x.ai https://accounts.x.ai https://cli-chat-proxy.grok.com https://api.github.com https://github.com https://objects.githubusercontent.com https://release-assets.githubusercontent.com ws: wss:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": [
+            "$HOME/**",
+            "$DOCUMENT/**",
+            "$DOWNLOAD/**",
+            "$DESKTOP/**",
+            "$APPDATA/**",
+            "$RESOURCE/**",
+            "$TEMP/**",
+            "$CACHE/**"
+          ],
+          "deny": [
+            "$HOME/.ssh/**",
+            "$HOME/.aws/**",
+            "$HOME/.gnupg/**",
+            "$HOME/.config/gh/**",
+            "$HOME/.grok/auth.json",
+            "$APPDATA/**/secrets.json"
+          ]
+        }
+      },
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg",
+      "nsis",
+      "appimage",
+      "deb",
+      "rpm"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "grokskin"
+        ],
+        "name": "Grok Skin Pack",
+        "description": "Grok appearance skin pack",
+        "role": "Editor",
+        "mimeType": "application/vnd.grok.skin"
+      }
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
+        "displayLanguageSelector": true
+      }
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      },
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
+      },
+      "rpm": {
+        "release": "1"
+      }
+    },
+    "macOS": {
+      "infoPlist": "Info.plist",
+      "entitlements": "Entitlements.plist"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": []
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "grok"
+        ]
+      }
+    }
+  }
+}

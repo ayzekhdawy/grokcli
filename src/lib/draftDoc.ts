@@ -1,0 +1,822 @@
+/**
+ * Composer draft document model: text segments + inline skill / reference chips.
+ * Storage / user bubbles use stable tokens `[[skill:name]]` / `[[file:…]]`.
+ * Agent prompts serialize skills as `/name` and references as `@path`.
+ */
+
+import {
+  isExternalHttpUrl,
+  refAgentText,
+  REF_TOKEN_RE,
+  refTokenText,
+  unescapeRefValue,
+  type RefKind,
+} from "./composerRefToken";
+
+/**
+ * 段落模型（与上游一致）：正文 / skill / plugin / 已挂载聊天。
+ *
+ * **不含**内联引用段 —— 上游那份 composer 编辑器就建立在「只有这几种段」的
+ * 假设上（它遍历时段落一定带 `text`）。我们新增的引用段走
+ * {@link RefSegment} / {@link AnyDraftSegment}，由 ref-aware 的 API 处理；
+ * 基版本 API 会把引用段降级成纯文本，旧编辑器因此永远看不到它。
+ */
+export type DraftSegment =
+  | { type: "text"; text: string }
+  | { type: "skill"; name: string }
+  | { type: "plugin"; name: string }
+  | { type: "chat"; sessionId: string; scope?: "recent" | "user" | "full" };
+
+/**
+ * 内联文件 / 目录 / URL 引用。存储态是 `[[file:…]]` 形式的 token，
+ * 发送给 CLI 时转成 `@路径`（URL 即其本身），位置保持在正文中说到的位置。
+ */
+export type RefSegment = { type: "ref"; kind: RefKind; value: string };
+
+/** 含引用段的超集：ref-aware API 的入参 / 出参类型。 */
+export type AnyDraftSegment = DraftSegment | RefSegment;
+
+/** Skill name character class: letters, digits, `_` `.` `:` `-`. */
+export const SKILL_NAME_RE = /[a-zA-Z0-9_.:-]+/;
+
+const SKILL_TOKEN_RE = /\[\[skill:([a-zA-Z0-9_.:-]+)\]\]/g;
+const PLUGIN_TOKEN_RE = /\[\[plugin:([a-zA-Z0-9_.:-]+)\]\]/g;
+
+/**
+ * Combined skill + plugin + attached-chat + ref tokens, in document order.
+ * 分组顺序必须与 {@link parseStoredContent} 的读取顺序一致。
+ */
+const STORED_TOKEN_RE =
+  /\[\[skill:([a-zA-Z0-9_.:-]+)\]\]|\[\[plugin:([a-zA-Z0-9_.:-]+)\]\]|\[\[chat:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?::(recent|user|full))?\]\]|\[\[(file|dir|url):([^\]\r\n]*)\]\]/g;
+
+/**
+ * Slash names that are App/Build commands, not skill chips, when rehydrating
+ * agent-form history (`/name` lines saved from session_send).
+ */
+const NON_SKILL_SLASH = new Set(
+  [
+    "goal",
+    "plan",
+    "compact",
+    "status",
+    "mcp",
+    "doctor",
+    "new",
+    "newchat",
+    "automations",
+    "workflow",
+    "workflows",
+    "settings",
+    "yolo",
+    "always-approve",
+    "loop",
+    "model",
+    "effort",
+    "help",
+    "clear",
+    "resume",
+    "export",
+    "copy",
+    "find",
+    "history",
+    "feedback",
+    "live-voice",
+    "livevoice",
+    "attach-chat",
+    "attachchat",
+  ].map((s) => s.toLowerCase()),
+);
+
+/**
+ * Convert agent-form user text (`/skill-name\nbody`) into display tokens
+ * (`[[skill:name]]\nbody`) so history bubbles can render chips.
+ * Already-tokenized content is left unchanged.
+ */
+export function hydrateDisplayContent(content: string): string {
+  if (!content) return content;
+  // 引用不需要在这里还原：本应用写 journal 时用的是**显示态**（`display_text`），
+  // file / dir 引用落盘就是 `[[file:…]]` 形态，读回来直接就是 token。
+  // 反过来把正文里的 `@绝对路径` 猜成引用是不可取的：那会让「用户真写了
+  // `@/usr/bin/foo`」的普通叙述在所有人的会话里变成 chip（与用哪套输入框编辑器无关）。
+  // 已 token 化（本应用写的 journal）直接放行；下面只处理 agent 形态的 skill 行。
+  if (content.includes("[[skill:")) return content;
+  if (!content.startsWith("/") && !content.includes("/goal")) return content;
+
+  let rest = content;
+  // Drop goal mode prefix from display hydration (mode is session chrome, not a chip).
+  if (rest.startsWith("/goal\n")) {
+    rest = rest.slice("/goal\n".length);
+  } else if (rest === "/goal") {
+    return content;
+  }
+
+  const nl = rest.indexOf("\n");
+  const firstLine = (nl === -1 ? rest : rest.slice(0, nl)).trim();
+  const body = nl === -1 ? "" : rest.slice(nl + 1);
+
+  if (!firstLine) return content;
+
+  const parts = firstLine.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return content;
+  if (!parts.every((p) => /^\/[a-zA-Z0-9_.:-]+$/.test(p))) return content;
+
+  const names = parts.map((p) => p.slice(1));
+  // Require at least one invocable skill; skip pure built-in command lines.
+  const skillNames = names.filter(
+    (n) => !NON_SKILL_SLASH.has(n.toLowerCase()),
+  );
+  if (skillNames.length === 0) return content;
+  // Only convert when every first-line token is a skill (not mixed with builtins).
+  if (skillNames.length !== names.length) return content;
+
+  const chips = skillNames.map((n) => `[[skill:${n}]]`).join("");
+  if (!body) return chips;
+  // Preserve body; chips sit before the rest of the message.
+  return `${chips}\n${body}`;
+}
+
+/** Parse user message for display/edit (hydrates agent-form history first). */
+export function parseUserMessageContent(content: string): DraftSegment[] {
+  return parseStoredContent(hydrateDisplayContent(content));
+}
+
+/** Empty draft (no segments). */
+export function emptyDraft(): DraftSegment[] {
+  return [];
+}
+
+/** Single text segment, or empty draft when text is empty. */
+export function draftFromPlainText(text: string): DraftSegment[] {
+  if (!text) return [];
+  return [{ type: "text", text }];
+}
+
+/**
+ * Parse stored content with `[[skill:name]]` tokens into segments.
+ * Invalid / incomplete tokens stay as plain text.
+ */
+/** 与 {@link parseUserMessageContent} 同一实现，但保留引用段（聊天侧 / TipTap 侧）。 */
+export function parseUserMessageContentWithRefs(
+  content: string,
+): AnyDraftSegment[] {
+  return parseStoredContentWithRefs(hydrateDisplayContent(content));
+}
+
+export function parseStoredContent(content: string): DraftSegment[] {
+  // 基版本（上游签名）：引用段降级为它的 token 文本，旧编辑器不会拿到 ref 段。
+  return parseStoredContentWithRefs(content).map((s) =>
+    s.type === "ref"
+      ? { type: "text" as const, text: refTokenText(s.kind, s.value) }
+      : s,
+  );
+}
+
+/** 与 {@link parseStoredContent} 同一实现，但保留引用段（我们侧使用）。 */
+export function parseStoredContentWithRefs(content: string): AnyDraftSegment[] {
+  if (!content) return [];
+  if (
+    !content.includes("[[skill:") &&
+    !content.includes("[[plugin:") &&
+    !content.includes("[[chat:") &&
+    !content.includes("[[file:") &&
+    !content.includes("[[dir:") &&
+    !content.includes("[[url:")
+  ) {
+    return [{ type: "text", text: content }];
+  }
+  const segments: AnyDraftSegment[] = [];
+  let last = 0;
+  const re = new RegExp(STORED_TOKEN_RE.source, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    if (m.index > last) {
+      segments.push({ type: "text", text: content.slice(last, m.index) });
+    }
+    if (m[1]) {
+      segments.push({ type: "skill", name: m[1] });
+    } else if (m[2]) {
+      segments.push({ type: "plugin", name: m[2] });
+    } else if (m[3]) {
+      const scope =
+        m[4] === "user" || m[4] === "full" || m[4] === "recent"
+          ? m[4]
+          : undefined;
+      segments.push({
+        type: "chat",
+        sessionId: m[3],
+        scope: scope === "recent" ? undefined : scope,
+      });
+    } else if (m[5]) {
+      const kind = m[5] as RefKind;
+      const value = unescapeRefValue(m[6] ?? "");
+      // 恢复入口（历史 / 草稿）也校验协议：手改过的存储态可能带
+      // `[[url:javascript:…]]`，不校验就会渲染成一个可点击语义的 chip（C11）。
+      if (kind === "url" && !isExternalHttpUrl(value)) {
+        segments.push({ type: "text", text: m[0] });
+      } else {
+        segments.push({ type: "ref", kind, value });
+      }
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < content.length) {
+    segments.push({ type: "text", text: content.slice(last) });
+  }
+  return segments;
+}
+
+/** Serialize segments back to stored form (`[[skill:name]]` / `[[file:…]]` tokens). */
+export function serializeStored(segments: AnyDraftSegment[]): string {
+  return segments
+    .map((s) => {
+      if (s.type === "text") return s.text;
+      if (s.type === "skill") return `[[skill:${s.name}]]`;
+      if (s.type === "plugin") return `[[plugin:${s.name}]]`;
+      if (s.type === "ref") return refTokenText(s.kind, s.value);
+      return s.scope && s.scope !== "recent"
+        ? `[[chat:${s.sessionId}:${s.scope}]]`
+        : `[[chat:${s.sessionId}]]`;
+    })
+    .join("");
+}
+
+/**
+ * Replace `[[skill:name]]` with `/name` in place for one-line previews
+ * (queue strip, titles). Keeps surrounding text order — unlike
+ * {@link serializeForAgent}, which groups skills first.
+ */
+export function previewStoredAsSlash(stored: string): string {
+  if (!stored) return stored;
+  return stored
+    .replace(new RegExp(SKILL_TOKEN_RE.source, "g"), "/$1")
+    .replace(new RegExp(PLUGIN_TOKEN_RE.source, "g"), "/$1")
+    .replace(
+      /\[\[chat:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?::(recent|user|full))?\]\]/g,
+      "",
+    )
+    // 引用 token 预览成它发送时的样子（`@路径` / URL），否则会漏出原始 token。
+    .replace(
+      new RegExp(REF_TOKEN_RE.source, "g"),
+      (_m, kind: RefKind, value: string) =>
+        refAgentText(kind, unescapeRefValue(value)),
+    )
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/^\n+/, "")
+    .trim();
+}
+
+/**
+ * Text of text segments only (skills omitted).
+ * Do not use alone for "has content" when skills may be present — use `isDraftEmpty`.
+ */
+export function plainTextOf(segments: AnyDraftSegment[]): string {
+  return segments
+    .filter((s): s is { type: "text"; text: string } => s.type === "text")
+    .map((s) => s.text)
+    .join("");
+}
+
+/**
+ * 供纯文本编辑（行内编辑用户消息）使用的正文：引用段渲染成其 agent 形态
+ * （`@绝对路径` / URL 本身）留在**原位**，而不是像 {@link plainTextOf} 那样被丢掉。
+ *
+ * 行内编辑用的是 textarea，无法承载原子 chip；引用必须在正文里可读、可改，
+ * 位置也不能挪（「在 @a.ts 中找到」换个位置就成了另一句话）。
+ */
+export function editableTextOf(segments: AnyDraftSegment[]): string {
+  return segments
+    .map((s) => {
+      if (s.type === "text") return s.text;
+      if (s.type === "ref") return refAgentText(s.kind, s.value);
+      return "";
+    })
+    .join("");
+}
+
+/**
+ * {@link editableTextOf} 的逆操作：把编辑后的纯文本切回段落，其中**原文里出现过
+ * 的引用**按其 agent 形态逐个认回，位置不变。
+ *
+ * 只认 `refs` 里给出的那几个具体字符串（来自解析过的原文），所以不会把用户随手
+ * 写的 `@某人`、`@/goal` 误判成引用（验收 C9）。用户在编辑框里改掉或删掉的引用
+ * 认不回来，就按普通文本留下 —— 不猜、不补。
+ */
+export function segmentsFromEditedText(
+  text: string,
+  refs: readonly RefSegment[],
+): AnyDraftSegment[] {
+  if (refs.length === 0) return text ? [{ type: "text", text }] : [];
+  const segments: AnyDraftSegment[] = [];
+  let cursor = 0;
+  for (const ref of refs) {
+    const needle = refAgentText(ref.kind, ref.value);
+    if (!needle) continue;
+    const at = text.indexOf(needle, cursor);
+    if (at === -1) continue;
+    if (at > cursor) segments.push({ type: "text", text: text.slice(cursor, at) });
+    segments.push(ref);
+    cursor = at + needle.length;
+  }
+  if (cursor < text.length) segments.push({ type: "text", text: text.slice(cursor) });
+  return mergeAdjacentText(segments);
+}
+
+/** Empty when there are no skills, no attached chats, and no non-whitespace text. */
+export function isDraftEmpty(segments: AnyDraftSegment[]): boolean {
+  for (const s of segments) {
+    if (
+      s.type === "skill" ||
+      s.type === "plugin" ||
+      s.type === "chat" ||
+      // 只引用一个文件也是可发送内容（发送时会变成 `@路径`）。
+      (s.type === "ref" && s.value.trim() !== "")
+    ) {
+      return false;
+    }
+    if (s.type === "text" && s.text.trim() !== "") return false;
+  }
+  return true;
+}
+
+/**
+ * Build the string sent to the agent:
+ * - skills in order as `/name`, space-joined
+ * - then `\n` + joined text parts (ends trimmed; internal newlines kept)
+ * - `goalMode` prefixes `/goal\n`
+ */
+export function serializeForAgent(
+  segments: AnyDraftSegment[],
+  opts?: { goalMode?: boolean; pluginSkills?: Record<string, string[]> },
+): string {
+  const pluginSkills = opts?.pluginSkills ?? {};
+  const covered = new Set<string>();
+  for (const s of segments) {
+    if (s.type !== "plugin") continue;
+    for (const n of pluginSkills[s.name] ?? []) {
+      covered.add(n.toLowerCase());
+    }
+  }
+  const skillTokens: string[] = [];
+  const seenSkill = new Set<string>();
+  const pushSkill = (name: string) => {
+    const key = name.toLowerCase();
+    if (!name || seenSkill.has(key)) return;
+    seenSkill.add(key);
+    skillTokens.push(`/${name}`);
+  };
+  const textParts: string[] = [];
+  for (const s of segments) {
+    if (s.type === "plugin") {
+      for (const n of pluginSkills[s.name] ?? []) pushSkill(n);
+    } else if (s.type === "skill") {
+      if (covered.has(s.name.toLowerCase())) continue;
+      pushSkill(s.name);
+    } else if (s.type === "ref") {
+      // 引用保持在正文里说到的位置（不是像 skill 那样提到最前），
+      // 否则「在 @文件 中找到…」会被打乱成「@文件 在 中找到…」。
+      textParts.push(refAgentText(s.kind, s.value));
+    } else if (s.type === "text") textParts.push(s.text);
+  }
+
+  const skillsPart = skillTokens.join(" ");
+  // Trim only leading/trailing whitespace; keep internal newlines.
+  const textPart = textParts.join("").replace(/^\s+/, "").replace(/\s+$/, "");
+
+  let body: string;
+  if (skillsPart && textPart) body = `${skillsPart}\n${textPart}`;
+  else if (skillsPart) body = skillsPart;
+  else body = textPart;
+
+  if (opts?.goalMode) {
+    return body ? `/goal\n${body}` : "/goal";
+  }
+  return body;
+}
+
+/**
+ * Replace the active slash range `[slashStart, slashEnd)` with a skill token
+ * plus a trailing space.
+ */
+export function applySkillAtSlash(
+  stored: string,
+  slashStart: number,
+  slashEnd: number,
+  skillName: string,
+): string {
+  const token = `[[skill:${skillName}]] `;
+  return stored.slice(0, slashStart) + token + stored.slice(slashEnd);
+}
+
+export function applyPluginAtSlash(
+  stored: string,
+  slashStart: number,
+  slashEnd: number,
+  pluginName: string,
+): string {
+  const token = `[[plugin:${pluginName}]] `;
+  return stored.slice(0, slashStart) + token + stored.slice(slashEnd);
+}
+
+/**
+ * Normalize contenteditable plain text without changing newline structure.
+ * Fullwidth solidus → `/` (1:1); drop zero-width / object-replacement ghosts.
+ */
+export function normalizeEditorPlainText(t: string): string {
+  return t
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\uFF0F/g, "/") // fullwidth solidus
+    .replace(/[\u200B-\u200D\uFEFF\u2060\uFFFC]/g, ""); // zero-width + ORC
+}
+
+/**
+ * Plain text as shown in a contenteditable (not React draft state).
+ * Prefer this for live slash *filter display* when IME lags draft/onChange.
+ * Do **not** use indices from this string to mutate stored draft when chips
+ * are present — use {@link readStoredEditorText} / {@link detectSlashRangeOnStored}.
+ */
+export function readPlainEditorText(el: HTMLElement): string {
+  let t = el.innerText ?? el.textContent ?? "";
+  return normalizeEditorPlainText(t);
+}
+
+/**
+ * Contenteditable → stored draft form (`[[skill:name]]` tokens + real newlines).
+ *
+ * Policy for the **user bubble / journal**: store what the user typed — including
+ * blank lines. Do not fold `\n+`, re-paragraph, or “pretty up” text.
+ *
+ * Uses an in-tree walk (not detached `innerText`, which is layout-dependent and
+ * lossy on clones). Top-level block boxes (WebKit `DIV` lines) become lines
+ * joined by `\n`; empty blocks are empty lines.
+ */
+export function readStoredEditorText(el: HTMLElement): string {
+  return serializeEditorDomWalk(el);
+}
+
+/** Block tags WebKit/contenteditable use as line boxes. */
+function isEditorBlockTag(tag: string): boolean {
+  return (
+    tag === "DIV" ||
+    tag === "P" ||
+    tag === "LI" ||
+    tag === "H1" ||
+    tag === "H2" ||
+    tag === "H3" ||
+    tag === "H4" ||
+    tag === "H5" ||
+    tag === "H6" ||
+    tag === "SECTION" ||
+    tag === "ARTICLE" ||
+    tag === "BLOCKQUOTE"
+  );
+}
+
+function cleanEditorText(raw: string): string {
+  return raw
+    .replace(/[\u200B-\u200D\uFEFF\u2060\uFFFC]/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+}
+
+function chipTokenFromEl(he: HTMLElement): string | null {
+  // 内联引用 chip：DOM 上带 data-ref-token / data-ref-value。
+  const refKind = he.getAttribute("data-ref-token");
+  if (refKind === "file" || refKind === "dir" || refKind === "url") {
+    const value = he.getAttribute("data-ref-value") ?? "";
+    return value ? refTokenText(refKind, value) : null;
+  }
+  const plugin =
+    he.dataset?.plugin || he.getAttribute("data-plugin") || "";
+  if (plugin || he.hasAttribute("data-plugin")) {
+    return plugin ? `[[plugin:${plugin}]]` : null;
+  }
+  if (he.dataset?.skill != null || he.hasAttribute("data-skill")) {
+    const name = he.dataset?.skill || he.getAttribute("data-skill") || "";
+    return name ? `[[skill:${name}]]` : null;
+  }
+  return null;
+}
+
+/**
+ * Inline content of one line box: text + soft `<br>` → `\n` + skill tokens.
+ * A caret-only `<br>` in an otherwise empty line yields `""` (empty line body).
+ */
+export function serializeEditorLineContent(el: HTMLElement): string {
+  const parts: string[] = [];
+
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const t = cleanEditorText(node.textContent ?? "");
+      if (t) parts.push(t);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const he = node as HTMLElement;
+    const chip = chipTokenFromEl(he);
+    if (chip) {
+      parts.push(chip);
+      return;
+    }
+    if (he.tagName === "BR") {
+      parts.push("\n");
+      return;
+    }
+    const kids = he.childNodes;
+    for (let i = 0; i < kids.length; i++) walk(kids[i]!);
+  };
+
+  const kids = el.childNodes;
+  for (let i = 0; i < kids.length; i++) walk(kids[i]!);
+
+  let line = parts.join("");
+  // Empty line placeholder: sole <br> → treat as empty body (caller joins lines).
+  if (line === "\n" || line === "") return "";
+  // "hello<br>" caret at end of non-empty line → drop one trailing break.
+  if (line.endsWith("\n") && !line.endsWith("\n\n")) {
+    line = line.slice(0, -1);
+  }
+  return line;
+}
+
+/**
+ * DOM → stored draft (live tree walk). Exported for tests via structural helpers.
+ *
+ * - **Block children** of the editor: each top-level `DIV`/`P`/… is one line;
+ *   lines joined with `\n`. Empty block ⇒ blank line (keeps `\n\n`).
+ * - **Flat** (text + `<br>` + chips, no line boxes): br/text walk, keep every `\n`.
+ */
+export function serializeEditorDomWalk(
+  root: HTMLElement,
+  opts?: { preserveWhitespaceOnly?: boolean },
+): string {
+  const kids = Array.from(root.childNodes);
+  const hasBlockChild = kids.some(
+    (n) =>
+      n.nodeType === Node.ELEMENT_NODE &&
+      isEditorBlockTag((n as Element).tagName),
+  );
+
+  let t: string;
+
+  if (hasBlockChild) {
+    const lines: string[] = [];
+    for (const n of kids) {
+      if (n.nodeType === Node.TEXT_NODE) {
+        const tx = cleanEditorText(n.textContent ?? "");
+        if (!tx) continue;
+        // Rare loose text at root with embedded newlines.
+        const pieces = tx.split("\n");
+        for (const p of pieces) lines.push(p);
+        continue;
+      }
+      if (n.nodeType !== Node.ELEMENT_NODE) continue;
+      const he = n as HTMLElement;
+      if (he.tagName === "BR") {
+        // Extra break between blocks = extra empty line.
+        lines.push("");
+        continue;
+      }
+      const chip = chipTokenFromEl(he);
+      if (chip) {
+        lines.push(chip);
+        continue;
+      }
+      if (isEditorBlockTag(he.tagName)) {
+        lines.push(serializeEditorLineContent(he));
+        continue;
+      }
+      // Other wrappers (e.g. pad spans): fold as a line fragment.
+      lines.push(serializeEditorLineContent(he));
+    }
+    // WebKit inserts a caret sentinel empty block. Drop it — unless the last
+    // block is an intentional trailing newline (`data-composer-nl`).
+    const lastBlock = [...kids]
+      .reverse()
+      .find(
+        (n) =>
+          n.nodeType === Node.ELEMENT_NODE &&
+          isEditorBlockTag((n as Element).tagName),
+      ) as HTMLElement | undefined;
+    const lastEmpty = lines.length > 0 && lines[lines.length - 1] === "";
+    const keepTrailingEmpty = shouldKeepTrailingEmptyLine({
+      lastLineEmpty: lastEmpty,
+      markedIntentional: lastBlock?.getAttribute("data-composer-nl") === "1",
+      caretInLastLine: false,
+      lineCount: lines.length,
+    });
+    t = joinEditorBlockLines(lines, keepTrailingEmpty);
+  } else {
+    // Flat model (insertText \n / appendTextWithBreaks).
+    const parts: string[] = [];
+    const walkFlat = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const tx = cleanEditorText(node.textContent ?? "");
+        if (tx) parts.push(tx);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const he = node as HTMLElement;
+      const chip = chipTokenFromEl(he);
+      if (chip) {
+        parts.push(chip);
+        return;
+      }
+      if (he.tagName === "BR") {
+        parts.push("\n");
+        return;
+      }
+      const ch = he.childNodes;
+      for (let i = 0; i < ch.length; i++) walkFlat(ch[i]!);
+    };
+    for (const n of kids) walkFlat(n);
+    t = parts.join("");
+  }
+
+  if (
+    !opts?.preserveWhitespaceOnly &&
+    !t.replace(/\n/g, "").trim() &&
+    // 只有 token 的 draft（skill 或引用）同样是可发送内容，不能判空。
+    !/\[\[(?:skill|plugin|file|dir|url):/.test(t)
+  ) {
+    return "";
+  }
+  return t;
+}
+
+/** True when the last empty block is a real trailing newline, not a caret sentinel. */
+export function shouldKeepTrailingEmptyLine(opts: {
+  lastLineEmpty: boolean;
+  markedIntentional: boolean;
+  caretInLastLine: boolean;
+  lineCount: number;
+}): boolean {
+  if (opts.lineCount < 2 || !opts.lastLineEmpty) return false;
+  return opts.markedIntentional || opts.caretInLastLine;
+}
+
+/** Join block-line bodies. Keep a last empty line only when it is intentional. */
+export function joinEditorBlockLines(
+  lines: string[],
+  keepTrailingEmpty: boolean,
+): string {
+  const out = [...lines];
+  if (!keepTrailingEmpty && out.length >= 2 && out[out.length - 1] === "") {
+    out.pop();
+  }
+  return out.join("\n");
+}
+
+/**
+ * Insert a newline into a stored draft string at `caret` (0…length).
+ * Pure helper for Enter handling — draft is SoT, not a lossy DOM round-trip.
+ */
+export function insertNewlineAt(stored: string, caret: number): string {
+  const i = Math.max(0, Math.min(caret, stored.length));
+  return stored.slice(0, i) + "\n" + stored.slice(i);
+}
+
+/**
+ * Next stored draft after Enter / Shift+Enter.
+ * `liveStored` must be the serialized **live editor**, never a lagging React
+ * snapshot — rewriting the contenteditable from `lastValue` deleted typed text.
+ */
+export function composerEnterNextStored(
+  liveStored: string,
+  caret: number,
+): string {
+  return insertNewlineAt(liveStored, caret);
+}
+
+/**
+ * Detect an active slash token at the end of `textBeforeCursor`.
+ * `/` must be at index 0 or immediately after whitespace.
+ * Query is the non-whitespace rest after `/`.
+ * Returns null when there is no active slash (e.g. `https://`).
+ *
+ * Contenteditable almost always serializes a trailing `\n` (from `<br>`).
+ * Without trimming, `/目标\n` fails `$` anchor and filtering looks "broken".
+ *
+ * Indices are on the trailing-whitespace-trimmed form of the input (after
+ * 1:1 fullwidth `/` and zero-width strip). Prefer {@link detectSlashRangeOnStored}
+ * when applying mutations so `end` is exact on the stored draft.
+ *
+ * Pass **text before the caret** (not necessarily the full draft) so a `/query`
+ * in the middle of the message — after a newline or space — still opens the panel.
+ */
+export function detectSlashQuery(
+  textBeforeCursor: string,
+): { start: number; query: string } | null {
+  const range = detectSlashRangeOnStored(textBeforeCursor);
+  if (!range) return null;
+  return { start: range.start, query: range.query };
+}
+
+/**
+ * Slash range on **stored draft form** (or the stored prefix before the caret).
+ * Trailing whitespace is ignored for matching only; `start`/`end` are never
+ * taken from a newline-collapsed rewrite of the body.
+ *
+ * `end` is exclusive and equals `start + 1 + query.length` (the `/query` span).
+ *
+ * When `text` is only the prefix before the caret, indices are also valid in the
+ * full draft (prefix is a stored-form prefix of the full string).
+ */
+export function detectSlashRangeOnStored(
+  stored: string,
+): { start: number; query: string; end: number } | null {
+  if (!stored) return null;
+  // 1:1 / ghost cleanup only — do not collapse newlines or drop blank lines.
+  const cleaned = normalizeEditorPlainText(stored);
+  // Trim trailing whitespace for `$` match without rewriting the body prefix.
+  let endExclusive = cleaned.length;
+  while (endExclusive > 0) {
+    const ch = cleaned.charCodeAt(endExclusive - 1);
+    // space, tab, LF, CR, NBSP (NBSP already mapped to space in normalize)
+    if (ch === 0x20 || ch === 0x09 || ch === 0x0a || ch === 0x0d) {
+      endExclusive -= 1;
+      continue;
+    }
+    break;
+  }
+  const head = cleaned.slice(0, endExclusive);
+  const m = /(^|[\s])\/([^\s]*)$/u.exec(head);
+  if (!m) return null;
+  const start = m.index + m[1]!.length;
+  const query = m[2]!;
+  const end = start + 1 + query.length;
+  return { start, query, end };
+}
+
+/**
+ * Stored-form text from the start of the editor through the caret
+ * (same coordinate space as {@link readStoredEditorText}).
+ * Returns null when there is no collapsed caret inside `el`.
+ */
+export function getStoredTextBeforeCaret(
+  el: HTMLElement | null | undefined,
+): string | null {
+  if (!el || typeof window === "undefined") return null;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!el.contains(range.startContainer)) return null;
+  const pre = document.createRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const frag = pre.cloneContents();
+  const tmp = document.createElement("div");
+  tmp.appendChild(frag);
+  // Caret-prefix clones are often newline-only (`\n\n` before later text).
+  // Collapsing those to "" made Enter insert at offset 0 and rewrite the body.
+  return serializeEditorDomWalk(tmp, { preserveWhitespaceOnly: true });
+}
+
+/**
+ * Live slash token from a contenteditable element.
+ *
+ * Prefers **text before the caret** so `/query` works mid-message (after a
+ * newline or space), not only at the end of the full draft. Falls back to the
+ * full stored text when the caret cannot be read.
+ *
+ * Indices are stored-form so they apply to React draft / `applySkillAtSlash`.
+ */
+export function detectSlashQueryFromEditor(
+  el: HTMLElement | null | undefined,
+): { start: number; query: string; end: number } | null {
+  if (!el) return null;
+  const before = getStoredTextBeforeCaret(el);
+  if (before != null) {
+    const atCaret = detectSlashRangeOnStored(before);
+    if (atCaret) return atCaret;
+    // Caret known but no slash before it — do not fall back to a slash at the
+    // far end of the document (user is editing elsewhere).
+    return null;
+  }
+  return detectSlashRangeOnStored(readStoredEditorText(el));
+}
+
+/** Collapse consecutive text segments into one. */
+export function mergeAdjacentText(segments: AnyDraftSegment[]): AnyDraftSegment[] {
+  if (segments.length === 0) return [];
+  const out: AnyDraftSegment[] = [];
+  for (const s of segments) {
+    const prev = out[out.length - 1];
+    if (s.type === "text" && prev?.type === "text") {
+      out[out.length - 1] = { type: "text", text: prev.text + s.text };
+    } else {
+      out.push(s);
+    }
+  }
+  return out;
+}
+
+/**
+ * Simple editor projection: text as-is, skills as `[[skill:name]]`.
+ * Same wire form as `serializeStored`.
+ */
+export function segmentsToPlainEditorText(segments: AnyDraftSegment[]): string {
+  return serializeStored(segments);
+}

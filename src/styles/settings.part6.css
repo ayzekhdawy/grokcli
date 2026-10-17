@@ -1,0 +1,735 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+
+.md-body h1,
+.md-body h2,
+.md-body h3 {
+  margin: 1em 0 0.4em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.md-body h1 {
+  font-size: 1.25em;
+}
+.md-body h2 {
+  font-size: 1.12em;
+}
+.md-body h3 {
+  font-size: 1.05em;
+}
+
+.md-body ul,
+.md-body ol {
+  margin: 0.4em 0 0.75em;
+  padding-left: 1.4em;
+}
+
+.md-body li {
+  margin: 0.2em 0;
+}
+
+/*
+ * ── Markdown 结构：Tailwind preflight 的全局补偿──────────────────
+ *
+ * Tailwind preflight（src/main.tsx 在 app.css 之前引入）设了
+ * `ol, ul, menu { list-style: none }`，而 preflight 之后没有任何地方恢复过。
+ * 结果是**全站** Markdown 列表都没有项目符号——聊天消息（.chat-md）、预览面
+ * （.md-body）、输入框（.composer__input）全中招，`.chat-md li::marker` 那条
+ * 颜色规则也因此一直是死规则。
+ *
+ * 三个作用域在这里一次补偿：这是同一个根因，分开写会漂移。
+ */
+.chat-md ul,
+.md-body ul,
+.composer__input ul {
+  list-style: disc;
+}
+.chat-md ul ul,
+.md-body ul ul,
+.composer__input ul ul {
+  list-style: circle;
+}
+.chat-md ul ul ul,
+.md-body ul ul ul,
+.composer__input ul ul ul {
+  list-style: square;
+}
+.chat-md ol,
+.md-body ol,
+.composer__input ol {
+  list-style: decimal;
+}
+.chat-md ol ol,
+.md-body ol ol,
+.composer__input ol ol {
+  list-style: lower-alpha;
+}
+.chat-md ol ol ol,
+.md-body ol ol ol,
+.composer__input ol ol ol {
+  list-style: lower-roman;
+}
+/* 聊天侧标记色规则（lobe-chat.part1b.css）此前因标记被关闭而未生效，现在生效。 */
+.composer__input li::marker {
+  color: var(--text-secondary);
+}
+
+.md-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.md-body blockquote {
+  margin: 0.6em 0;
+  padding: 0.2em 0 0.2em 12px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.md-body .katex {
+  font-size: 1.08em;
+  color: inherit;
+}
+
+.md-body .katex-display {
+  margin: 0.65em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.1em 0;
+}
+
+.md-body__pre {
+  margin: 0.6em 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-code);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.md-body__pre code {
+  color: inherit;
+  background: transparent;
+}
+
+.md-body__code-inline {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-code);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+/*
+ * Tables: fill wrap by default; overflow scrolls horizontally.
+ * width 100% + min-width max-content = stretch when narrow, grow when wide.
+ */
+.md-body__table-wrap,
+.md-body .chat-md__table-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.md-body table,
+.sd-body table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 13px;
+  width: 100%;
+  min-width: max-content;
+  max-width: none;
+  table-layout: auto;
+}
+
+.md-body th,
+.md-body td,
+.sd-body th,
+.sd-body td {
+  border: 1px solid var(--border-subtle);
+  padding: 6px 12px;
+  text-align: left;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.md-body th,
+.sd-body th {
+  background: var(--bg-hover);
+}
+
+.sd-body {
+  overflow-x: auto;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.working {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  padding: 4px 0;
+}
+
+.working__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-tertiary);
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* In-conversation find bar (Cmd/Ctrl+F) */
+.chat-find {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px var(--space-5) 0;
+  padding: 6px 8px 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card, var(--bg-elevated));
+  min-width: 0;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+
+.chat-find__icon {
+  display: inline-flex;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.chat-find__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.chat-find__input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.chat-find__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.chat-find__count {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  min-width: 4.5em;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.chat-find__count.is-empty {
+  color: var(--text-secondary);
+}
+
+.chat-find__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.chat-find__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.chat-find__btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.chat-find__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.chat-find__btn--close {
+  color: var(--text-tertiary);
+}
+
+.chat-find__chev--up {
+  transform: rotate(90deg);
+}
+
+/* Find hit marks + message chrome */
+.chat-find-mark {
+  background: color-mix(in srgb, #e6b800 48%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.chat-find-mark--current {
+  background: color-mix(in srgb, #ff9f0a 72%, transparent);
+  outline: 1px solid color-mix(in srgb, #ff9f0a 80%, transparent);
+}
+
+[data-theme="light"] .chat-find-mark {
+  background: color-mix(in srgb, #f5d76e 70%, transparent);
+}
+
+[data-theme="light"] .chat-find-mark--current {
+  background: color-mix(in srgb, #ffb020 78%, transparent);
+}
+
+.lobe-chat-item--find-current {
+  border-radius: 12px;
+  outline: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.lobe-chat-error.lobe-chat-item--find-current {
+  outline: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+/* Soft goal-orch session chip (only when CLI emitted goal_updated). */
+.goal-orch-session-chip-wrap .goal-orch-session-chip {
+  margin: 0;
+}
+.goal-orch-session-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 var(--space-5) 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-card, var(--bg-elevated)));
+  color: var(--text-secondary, var(--text));
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+  max-width: min(100%, 420px);
+  min-width: 0;
+}
+.goal-orch-session-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-card, var(--bg-elevated)));
+}
+.goal-orch-session-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--accent);
+  opacity: 0.85;
+}
+.goal-orch-session-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.goal-orch-session-chip__meta {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.goal-orch-session-chip--waiting {
+  border-style: dashed;
+  opacity: 0.92;
+}
+.goal-orch-session-chip--waiting .goal-orch-session-chip__dot {
+  animation: goal-orch-chip-pulse 1.4s ease-in-out infinite;
+}
+@keyframes goal-orch-chip-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.settings-workflows-run-result__log--live {
+  max-height: 180px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
+  background: color-mix(in srgb, var(--bg-elevated, var(--bg-card)) 92%, var(--accent));
+  font-size: 11.5px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Overlay host — zero flow size so the card cannot reserve a full-width strip. */
+.plan-bar-host {
+  flex: 0 0 0;
+  height: 0;
+  width: 100%;
+  position: relative;
+  z-index: 12;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Sticky plan/goal card — frosted overlay. No transform (breaks backdrop-filter). */
+.plan-bar {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: var(--env-summary-gutter, 0px);
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  width: min(42rem, calc(100% - 2 * var(--space-5)));
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--glass-border, var(--border-subtle));
+  background: color-mix(in srgb, var(--bg-elevated) 78%, transparent);
+  backdrop-filter: blur(var(--wallpaper-settings-blur, 18px))
+    saturate(var(--glass-saturate, 1.4));
+  -webkit-backdrop-filter: blur(var(--wallpaper-settings-blur, 18px))
+    saturate(var(--glass-saturate, 1.4));
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+  min-width: 0;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+[data-theme="light"] .plan-bar {
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.04),
+    0 10px 28px rgba(0, 0, 0, 0.06);
+}
+
+.plan-bar--review {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-subtle));
+}
+
+.plan-bar__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.plan-bar__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  flex-shrink: 0;
+}
+
+.plan-bar--review .plan-bar__icon,
+.plan-bar--progress .plan-bar__icon,
+.plan-bar--goal .plan-bar__icon {
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.plan-bar__text {
+  min-width: 0;
+  flex: 1;
+}
+
+.plan-bar__headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.plan-bar__headline strong {
+  font-weight: 600;
+}
+
+.plan-bar__fraction {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-bar__current {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.plan-bar__current-label {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.plan-bar__current-step {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-bar__meter {
+  flex: 1 1 100%;
+  order: 3;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  overflow: hidden;
+}
+
+.plan-bar__meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.plan-bar--review .plan-bar__meter-fill {
+  background: var(--accent-hover, var(--accent));
+}
+
+.plan-bar__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.plan-bar__btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.plan-bar__btn.btn--ghost {
+  border: none;
+  background: transparent;
+}
+
+.plan-bar__btn.btn--ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.plan-bar__btn--clear-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-bar__close {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.plan-bar__close:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Plan review workbench (resource pane) */
+.plan-review {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-main, var(--bg-elevated));
+}
+.plan-review__header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+}
+.plan-review__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.plan-review__title-row--btn {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.plan-review__title-row--btn:disabled {
+  cursor: default;
+}
+.plan-review__title-row--btn:not(:disabled):hover .plan-review__title {
+  color: var(--accent);
+}
+.plan-review__chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.plan-review__current {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.plan-review__current-label {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+.plan-review__current-step {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-review--collapsed {
+  /* Header-only: no scroll region taking empty space */
+  height: auto;
+  min-height: 0;
+}
+.plan-review--collapsed .plan-review__header {
+  border-bottom: none;
+}
+.plan-review__md--after-steps {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.lobe-chat-plan--chip .lobe-chat-plan__body {
+  display: none;
+}
+.plan-review__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-muted);
+  flex-shrink: 0;
+}
+.plan-review__titles {
+  min-width: 0;
+  flex: 1;
+}
+.plan-review__status {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.plan-review__title {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+  word-break: break-word;
+}
+.plan-review__fraction {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.plan-review__meter {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.plan-review__meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+.plan-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

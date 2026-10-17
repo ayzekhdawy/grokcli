@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <script>
+      /* Pet overlay: kill boot splash before first paint. Must stay first in <head>. */
+      (function () {
+        var h = location.hash || "";
+        if (h !== "#/pet" && h.indexOf("#/pet?") !== 0) return;
+        document.documentElement.setAttribute("data-pet-shell", "1");
+        var s = document.createElement("style");
+        s.setAttribute("data-pet-boot", "1");
+        s.textContent =
+          "html,html[data-theme],html[data-theme] body,body,#root,.boot-gate{background:transparent!important;background-image:none!important;background-color:transparent!important;}html[data-pet-shell] .boot-gate,.boot-gate{display:none!important;visibility:hidden!important;opacity:0!important;}";
+        document.documentElement.appendChild(s);
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grok</title>
+    <!--
+      Static boot shell mirrors App setup-gate (Grok logo + title).
+      Visible the moment the WebView paints — before the JS bundle arrives.
+      React replaces #root on mount (same visual while appGate === "loading").
+    -->
+    <style>
+      /*
+       * Boot splash mirrors setup-gate. Theme comes from Host via
+       * initialization_script (window.__GROK_BOOT_THEME__ + data-theme).
+       * Fallback: OS prefers-color-scheme before Host injects.
+       */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      /* Default dark until data-theme is set */
+      html,
+      body,
+      .boot-gate {
+        background: #0d0d0d;
+        color: rgba(255, 255, 255, 0.92);
+        color-scheme: dark;
+      }
+      html[data-theme="light"],
+      html[data-theme="light"] body,
+      html[data-theme="light"] .boot-gate {
+        background: #f4f4f6;
+        color-scheme: light;
+        color: rgba(0, 0, 0, 0.88);
+      }
+      @media (prefers-color-scheme: light) {
+        html:not([data-theme]),
+        html:not([data-theme]) body,
+        html:not([data-theme]) .boot-gate {
+          background: #f4f4f6;
+          color: rgba(0, 0, 0, 0.88);
+        }
+      }
+      #root {
+        min-height: 100%;
+      }
+      .boot-gate[data-dev-hide] {
+        display: none !important;
+      }
+      .boot-gate {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-sizing: border-box;
+        background:
+          radial-gradient(
+            120% 80% at 50% -10%,
+            rgba(138, 164, 255, 0.14) 0%,
+            transparent 55%
+          ),
+          #0d0d0d;
+      }
+      html[data-theme="light"] .boot-gate {
+        background:
+          radial-gradient(
+            120% 80% at 50% -10%,
+            rgba(61, 95, 217, 0.1) 0%,
+            transparent 55%
+          ),
+          #f4f4f6;
+      }
+      @media (prefers-color-scheme: light) {
+        html:not([data-theme]) .boot-gate {
+          background:
+            radial-gradient(
+              120% 80% at 50% -10%,
+              rgba(61, 95, 217, 0.1) 0%,
+              transparent 55%
+            ),
+            #f4f4f6;
+        }
+      }
+      .boot-gate__center {
+        width: min(440px, calc(100vw - 48px));
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        position: relative;
+        padding-top: 28px;
+      }
+      .boot-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 8px;
+        padding-top: 12px;
+      }
+      .boot-logo {
+        width: 72px;
+        height: 72px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #1a1a1a;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.92);
+        box-shadow:
+          0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
+          0 8px 28px rgba(0, 0, 0, 0.4),
+          0 24px 64px rgba(0, 0, 0, 0.32);
+        animation: boot-logo-glow 1.2s ease-in-out infinite;
+      }
+      html[data-theme="light"] .boot-logo {
+        background: #ffffff;
+        border-color: rgba(0, 0, 0, 0.06);
+        color: rgba(0, 0, 0, 0.88);
+        box-shadow:
+          0 0 0 0.5px rgba(255, 255, 255, 0.7) inset,
+          0 8px 28px rgba(0, 0, 0, 0.1),
+          0 20px 48px rgba(0, 0, 0, 0.08);
+      }
+      @media (prefers-color-scheme: light) {
+        html:not([data-theme]) .boot-logo {
+          background: #ffffff;
+          border-color: rgba(0, 0, 0, 0.06);
+          color: rgba(0, 0, 0, 0.88);
+          box-shadow:
+            0 0 0 0.5px rgba(255, 255, 255, 0.7) inset,
+            0 8px 28px rgba(0, 0, 0, 0.1),
+            0 20px 48px rgba(0, 0, 0, 0.08);
+        }
+      }
+      @keyframes boot-logo-glow {
+        0%,
+        100% {
+          box-shadow:
+            0 0 0 0 transparent,
+            0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
+            0 8px 28px rgba(0, 0, 0, 0.4),
+            0 24px 64px rgba(0, 0, 0, 0.32);
+          border-color: rgba(255, 255, 255, 0.06);
+        }
+        50% {
+          box-shadow:
+            0 0 32px rgba(138, 164, 255, 0.28),
+            0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
+            0 8px 28px rgba(0, 0, 0, 0.4),
+            0 24px 64px rgba(0, 0, 0, 0.32);
+          border-color: rgba(140, 170, 255, 0.55);
+        }
+      }
+      html[data-theme="light"] .boot-logo {
+        animation-name: boot-logo-glow-light;
+      }
+      @media (prefers-color-scheme: light) {
+        html:not([data-theme]) .boot-logo {
+          animation-name: boot-logo-glow-light;
+        }
+      }
+      @keyframes boot-logo-glow-light {
+        0%,
+        100% {
+          box-shadow:
+            0 0 0 0 transparent,
+            0 0 0 0.5px rgba(255, 255, 255, 0.7) inset,
+            0 8px 28px rgba(0, 0, 0, 0.1),
+            0 20px 48px rgba(0, 0, 0, 0.08);
+          border-color: rgba(0, 0, 0, 0.06);
+        }
+        50% {
+          box-shadow:
+            0 0 28px rgba(61, 95, 217, 0.22),
+            0 0 0 0.5px rgba(255, 255, 255, 0.7) inset,
+            0 8px 28px rgba(0, 0, 0, 0.1),
+            0 20px 48px rgba(0, 0, 0, 0.08);
+          border-color: rgba(70, 100, 220, 0.55);
+        }
+      }
+      .boot-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        line-height: 1.35;
+      }
+      .boot-subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.58);
+        line-height: 1.55;
+      }
+      html[data-theme="light"] .boot-subtitle {
+        color: rgba(0, 0, 0, 0.55);
+      }
+      @media (prefers-color-scheme: light) {
+        html:not([data-theme]) .boot-subtitle {
+          color: rgba(0, 0, 0, 0.55);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-logo {
+          animation: none;
+        }
+      }
+    </style>
+    <script>
+      // Apply Host-injected theme + locale as early as possible (inline, before paint).
+      (function () {
+        try {
+          var t = window.__GROK_BOOT_THEME__;
+          if (t !== "light" && t !== "dark") {
+            t =
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+          }
+          document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {
+          /* ignore */
+        }
+        /*
+         * Boot copy for every shipped catalog. The splash paints before the JS
+         * bundle arrives, so it cannot read src/i18n — src/i18n/bootShell.test.ts
+         * asserts each row still equals that locale's `setup.title` and
+         * `setup.detecting`, so the two cannot drift apart.
+         */
+        var BOOT_COPY = {
+          "de": ["Willkommen bei Grok", "Grok Build wird geprüft…"],
+          "en": ["Welcome to Grok", "Checking Grok Build…"],
+          "es": ["Te damos la bienvenida a Grok", "Comprobando Grok Build…"],
+          "fil": ["Maligayang pagdating sa Grok", "Sini-check ang Grok Build…"],
+          "fr": ["Bienvenue dans Grok", "Vérification de Grok Build…"],
+          "id": ["Selamat datang di Grok", "Memeriksa Grok Build…"],
+          "it": ["Benvenuto in Grok", "Verifica di Grok Build…"],
+          "ja": ["Grok へようこそ", "Grok Build を確認中…"],
+          "ko": ["Grok에 오신 것을 환영합니다", "Grok Build 확인 중…"],
+          "pt-BR": ["Boas-vindas ao Grok", "Verificando o Grok Build…"],
+          "ru": ["Добро пожаловать в Grok", "Проверка Grok Build…"],
+          "ta": ["Grok க்கு வரவேற்கிறோம்", "Grok Build ஐச் சரிபார்க்கிறது…"],
+          "uk": ["Ласкаво просимо до Grok", "Перевірка Grok Build…"],
+          "zh": ["欢迎使用 Grok", "正在检测 Grok Build…"],
+          "zh-TW": ["歡迎使用 Grok", "正在偵測 Grok Build…"]
+        };
+        try {
+          var loc = window.__GROK_BOOT_LOCALE__;
+          if (!BOOT_COPY[loc]) {
+            // No Host value: `vite dev` in a browser, or a settings id this
+            // build predates. Aliases mirror `normalizeLocale` in src/i18n.
+            var nav = String(
+              (navigator.languages && navigator.languages[0]) ||
+                navigator.language ||
+                "",
+            ).toLowerCase();
+            if (nav.indexOf("zh") === 0) {
+              loc = /hant|tw|hk|mo/.test(nav) ? "zh-TW" : "zh";
+            } else if (nav.indexOf("pt") === 0) {
+              loc = "pt-BR";
+            } else if (nav.indexOf("tl") === 0) {
+              loc = "fil";
+            } else if (nav.indexOf("in") === 0) {
+              loc = "id";
+            } else {
+              var primary = nav.split(/[-_]/)[0];
+              loc = BOOT_COPY[primary] ? primary : "en";
+            }
+          }
+          // Catalog ids are valid BCP-47 except `zh` (see htmlLangForLocale).
+          document.documentElement.setAttribute(
+            "lang",
+            loc === "zh" ? "zh-CN" : loc,
+          );
+          var copy = BOOT_COPY[loc] || BOOT_COPY["en"];
+          var applyCopy = function () {
+            var titleEl = document.querySelector(".boot-title");
+            var subEl = document.querySelector(".boot-subtitle");
+            if (titleEl) titleEl.textContent = copy[0];
+            if (subEl) subEl.textContent = copy[1];
+          };
+          if (document.querySelector(".boot-title")) applyCopy();
+          else document.addEventListener("DOMContentLoaded", applyCopy);
+        } catch (e) {
+          /* ignore */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot-gate" data-testid="setup-booting" role="status" aria-live="polite">
+        <div class="boot-gate__center">
+          <div class="boot-hero">
+            <div class="boot-logo" aria-hidden="true">
+              <svg
+                width="44"
+                height="44"
+                viewBox="0 0 35 33"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M13.2371 21.0407L24.3186 12.8506C24.8619 12.4491 25.6384 12.6057 25.8973 13.2294C27.2597 16.5185 26.651 20.4712 23.9403 23.1851C21.2297 25.8989 17.4581 26.4941 14.0108 25.1386L10.2449 26.8843C15.6463 30.5806 22.2053 29.6665 26.304 25.5601C29.5551 22.3051 30.562 17.8683 29.6205 13.8673L29.629 13.8758C28.2637 7.99809 29.9647 5.64871 33.449 0.844576C33.5314 0.730667 33.6139 0.616757 33.6964 0.5L29.1113 5.09055V5.07631L13.2343 21.0436"
+                  fill="currentColor"
+                />
+                <path
+                  d="M10.9503 23.0313C7.07343 19.3235 7.74185 13.5853 11.0498 10.2763C13.4959 7.82722 17.5036 6.82767 21.0021 8.2971L24.7595 6.55998C24.0826 6.07017 23.215 5.54334 22.2195 5.17313C17.7198 3.31926 12.3326 4.24192 8.67479 7.90126C5.15635 11.4239 4.0499 16.8403 5.94992 21.4622C7.36924 24.9165 5.04257 27.3598 2.69884 29.826C1.86829 30.7002 1.0349 31.5745 0.36364 32.5L10.9474 23.0341"
+                  fill="currentColor"
+                />
+              </svg>
+            </div>
+            <h1 class="boot-title">欢迎使用 Grok</h1>
+            <p class="boot-subtitle">正在检测 Grok Build…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Dev: hide static splash as soon as the module graph starts. Vite HMR
+      // used to remount this node forever while Host heartbeats were watched.
+      try {
+        if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+          var g = document.querySelector(".boot-gate");
+          if (g) g.setAttribute("data-dev-hide", "1");
+        }
+      } catch (e) { /* ignore */ }
+    </script>
+  </body>
+</html>

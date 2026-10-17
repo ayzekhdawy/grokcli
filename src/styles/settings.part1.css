@@ -1,0 +1,931 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+.gh-heatmap__body {
+  display: flex;
+  align-items: flex-start;
+}
+
+.gh-heatmap__dow {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-tertiary);
+}
+
+.gh-heatmap__dow-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+}
+
+.gh-heatmap__grid {
+  display: grid;
+}
+
+.gh-heatmap__cell {
+  border-radius: 2px;
+  /* Soft edge like GitHub cells — not a hard black frame */
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  padding: 0;
+  outline: none;
+  cursor: pointer;
+  background: var(--heatmap-0);
+  box-sizing: border-box;
+  transition:
+    box-shadow 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.gh-heatmap__cell.is-empty {
+  pointer-events: none;
+  opacity: 0;
+  border-color: transparent;
+  cursor: default;
+}
+
+/*
+ * Selected / focus: thin outer ring (clearer than inset), kept restrained:
+ * 1px canvas gap + ~1.5px soft green — fits the 3px gutters without a heavy halo.
+ */
+.gh-heatmap__cell.is-selected {
+  z-index: 2;
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1px var(--bg-elevated, var(--surface-1, var(--bg, #fff))),
+    0 0 0 2.5px color-mix(in srgb, var(--heatmap-3, #30a14e) 72%, transparent);
+}
+
+.gh-heatmap__cell:not(.is-empty):hover:not(.is-selected) {
+  z-index: 1;
+  border-color: color-mix(in srgb, var(--text-primary) 20%, transparent);
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--text-primary) 16%, transparent);
+}
+
+.gh-heatmap__cell:not(.is-empty):focus-visible {
+  z-index: 2;
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1px var(--bg-elevated, var(--surface-1, var(--bg, #fff))),
+    0 0 0 2.5px color-mix(in srgb, var(--heatmap-3, #30a14e) 72%, transparent);
+}
+
+.account-section__title--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-heatmap-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.account-heatmap-title-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.account-heat-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-elevated, var(--surface-1));
+}
+
+.account-heat-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 8px;
+  text-align: center;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.account-heat-stat:last-child {
+  border-right: none;
+}
+
+.account-heat-stat__value {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.account-heat-stat__label {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .account-heat-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-heat-stat:nth-child(2n) {
+    border-right: none;
+  }
+
+  .account-heat-stat {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .account-heat-stat:nth-last-child(-n + 1) {
+    border-bottom: none;
+  }
+}
+
+.account-heatmap-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.account-heat-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.2));
+  gap: 2px;
+}
+
+.account-heat-toggle__btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.account-heat-toggle__btn:hover {
+  color: var(--text-primary);
+}
+
+.account-heat-toggle__btn.is-active {
+  background: var(--bg-elevated, var(--surface-1, #fff));
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.gh-heatmap__cell--week {
+  border-radius: 3px;
+}
+
+.gh-heatmap__legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* Portaled to document.body (fixed) — not clipped by heatmap overflow parents */
+.gh-heatmap__tip {
+  position: fixed;
+  z-index: 10060;
+  width: 168px;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--glass-surface-solid, var(--bg-elevated, #fff));
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border, var(--border-subtle));
+  box-shadow: var(
+    --glass-shadow,
+    var(--shadow-pop, 0 8px 24px rgba(0, 0, 0, 0.18))
+  );
+  backdrop-filter: blur(var(--glass-blur, 24px))
+    saturate(var(--glass-saturate, 1.4));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px))
+    saturate(var(--glass-saturate, 1.4));
+  font-size: 12px;
+  pointer-events: none;
+  /* Instant feel — no enter delay; light fade only */
+  animation: gh-heatmap-tip-in 0.06s ease-out;
+}
+
+.gh-heatmap__tip--hover {
+  width: 168px;
+}
+
+@keyframes gh-heatmap-tip-in {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.gh-heatmap__tip--above {
+  transform: translateY(-100%);
+}
+
+.gh-heatmap__tip--below {
+  transform: none;
+}
+
+.gh-heatmap__tip-date {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.gh-heatmap__tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.gh-heatmap__tip-row span:last-child {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.account-logs__row.is-day-hit {
+  background: color-mix(in srgb, var(--accent, #30a14e) 8%, transparent);
+}
+
+.account-logs__empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 16px 14px;
+}
+
+.account-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 720px;
+}
+
+.account-logs__head,
+.account-logs__row {
+  display: grid;
+  grid-template-columns: minmax(88px, 1.3fr) minmax(72px, 0.9fr) 48px 72px 64px 72px 80px minmax(96px, auto);
+  gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.account-logs__title-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.account-logs__hint {
+  margin: 0 0 8px;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.account-logs__status {
+  margin: 0 0 6px;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.account-logs__err {
+  margin: 0 0 6px;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--danger, #c23);
+}
+
+.account-logs__row-actions {
+  justify-self: end;
+}
+
+.account-logs__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 500;
+  background: var(--bg-elevated);
+}
+
+.account-logs__row {
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.account-logs__row:last-child {
+  border-bottom: none;
+}
+
+.account-logs__title {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.account-logs__mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .account-hero__head {
+    flex-wrap: wrap;
+  }
+
+  .account-hero__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* Settings is an atomic full-page swap over the still-mounted workbench. */
+.app-settings-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-main);
+}
+
+.app-settings-stage .settings-page {
+  background: var(--bg-main);
+}
+
+/* ===== Settings full page (ChatGPT-desktop style) ===== */
+.settings-page {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  position: relative;
+}
+
+/*
+ * Full-width drag overlay — sits on top of nav + content so the whole
+ * titlebar band can move the window (mac Overlay traffic lights ok).
+ */
+.settings-page__chrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-height, 40px);
+  z-index: 30;
+  user-select: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.settings-page__nav {
+  /* Match workbench rail (layout.sidebarWidth → --sidebar-rail-width). */
+  width: var(--sidebar-rail-width, var(--sidebar-width));
+  min-width: var(--sidebar-rail-width, var(--sidebar-width));
+  max-width: var(--sidebar-rail-width, var(--sidebar-width));
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-subtle);
+  /*
+   * Settings chrome is always solid so theme / wallpaper glass never
+   * shows through forms. overflow lives on __nav-inner.
+   */
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  /* Clear traffic-light / drag band */
+  padding-top: var(--titlebar-height, 40px);
+  box-sizing: border-box;
+}
+
+/* Win / non-mac: no vibrancy — use solid rail like workbench */
+.platform-win .settings-page__nav,
+.platform-other .settings-page__nav {
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
+}
+
+/* Legacy class kept for any residual selectors */
+.settings-page__titlebar {
+  display: none;
+}
+
+.settings-page__nav-inner {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.settings-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+}
+
+.settings-page__back:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-page__search-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 10px;
+  max-height: min(40vh, 280px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.settings-page__search-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  padding: 8px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.settings-page__search-hit:hover {
+  background: var(--bg-hover);
+}
+
+.settings-page__search-hit-label {
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.settings-page__search-hit-path {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.25;
+}
+
+.settings-page__tabs {
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.settings-page__tabs-seg {
+  flex-wrap: wrap;
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+.settings-page__tabs .settings-seg__btn {
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.settings-row.is-search-hit,
+.settings-card.is-search-hit {
+  /* Inset outline so parent .settings-card { overflow: hidden } does not clip it */
+  outline: 2px solid color-mix(in srgb, var(--accent, #6b8cff) 70%, transparent);
+  outline-offset: -2px;
+  border-radius: 10px;
+  position: relative;
+  z-index: 1;
+  animation: settings-search-hit-pulse 1.4s ease-out 1;
+}
+
+@keyframes settings-search-hit-pulse {
+  0% {
+    outline-color: color-mix(in srgb, var(--accent, #6b8cff) 95%, transparent);
+  }
+  100% {
+    outline-color: color-mix(in srgb, var(--accent, #6b8cff) 25%, transparent);
+  }
+}
+
+.settings-page__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+
+.settings-page__search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.settings-page__group-label {
+  margin: 10px 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+}
+
+/* Search with zero hits: centred explanation instead of bare group headers */
+.settings-page__nav-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 28px 12px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.settings-page__nav-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.settings-page__nav-empty-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.settings-page__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+}
+
+.settings-page__nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-page__nav-item.is-active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/*
+ * Content column — sole vertical scrollport for every settings section.
+ *
+ * CRITICAL (WebKit / Tauri): do NOT make this a flex container.
+ * When overflow-y:auto AND display:flex are combined, WebKit omits the
+ * container's padding-bottom (and flex items' padding-bottom) from the
+ * scrollable overflow height. max scrollTop ends flush with the last
+ * child's border box → every section looks glued to the window bottom.
+ *
+ * Center the column with margin:auto on .settings-page__main instead.
+ */
+.settings-page__content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--bg-main);
+  display: block;
+  /* Clear drag band so title is not under traffic lights / drag strip */
+  padding-top: var(--titlebar-height, 40px);
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.settings-page__main {
+  width: 100%;
+  /* ~53 weeks × (cell+gap) + labels needs ≥ ~860px content for a full year heatmap */
+  max-width: 960px;
+  margin: 0 auto;
+  /*
+   * Bottom inset is real content-box padding on a block child of a block
+   * scrollport — included in scroll height in WebKit (unlike flex).
+   */
+  padding: 16px 36px 96px;
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/*
+ * Providers dual-pane: lock outer scroll; title/tabs stay put; .prov-panel
+ * fills remaining height so left rail + right detail scroll independently.
+ * Safe to use flex here — content is overflow:hidden (not a scrollport).
+ */
+.settings-page__content--pane-fill {
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+}
+
+.settings-page__content--pane-fill > .settings-page__phone-bar {
+  flex-shrink: 0;
+}
+
+.settings-page__content--pane-fill > .settings-page__main {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.settings-page__main--pane-fill {
+  display: flex;
+  flex-direction: column;
+  /* Bottom padding lives inside scrolling panes, not the page */
+  padding-bottom: 16px;
+}
+
+.settings-page__main--pane-fill > .settings-page__title,
+.settings-page__main--pane-fill > .settings-account-tabs {
+  flex-shrink: 0;
+}
+
+.settings-page__main--pane-fill > .prov-panel,
+.settings-page__main--pane-fill > .settings-appearance-root {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.platform-mac .settings-page__main {
+  padding-top: 16px;
+}
+
+.settings-page__title {
+  margin: 0 0 18px;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.settings-page__h2 {
+  margin: 20px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-page__lead {
+  margin: -6px 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.settings-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+/* Stacked settings cards (e.g. Appearance: theme / skin / wallpaper) */
+.settings-page__main > .settings-card + .settings-card {
+  margin-top: 14px;
+}
+
+.settings-card--flush .settings-archived-row:last-child {
+  border-bottom: none;
+}
+
+.settings-archived-empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-tertiary);
+}
+
+.settings-archived-age {
+  margin: 0 0 14px;
+}
+
+.settings-archived-age__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.settings-archived-age__btn--empty {
+  opacity: 0.72;
+}
+
+.settings-archived-age__hint {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.settings-archived-age__hint--empty {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Archive-by-age pro confirm (GlassModal body) */
+.archive-age-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.archive-age-modal__msg {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.archive-age-modal__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated, var(--bg-card));
+}
+
+.archive-age-modal__preview-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.archive-age-modal__list {
+  margin: 0;
+  padding: 0 0 0 1.1em;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.archive-age-modal__item {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-age-modal__more {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings-archived-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+
+.settings-archived-toolbar__count {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+}
+
+.settings-archived-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.settings-archived-toolbar__actions .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Custom checkbox — matches app chrome (not native OS control) */
+.ui-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}

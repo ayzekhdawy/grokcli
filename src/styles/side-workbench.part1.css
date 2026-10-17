@@ -1,0 +1,1023 @@
+/*
+ * Expanded = overlay (not unmount / not width:0).
+ * Chat column stays in the flex tree with full DOM so collapse is instant and
+ * stable; aside paints over the free area (right of the session rail).
+ * Optional docked composer (icon toggle on SideTabBar): class
+ * .workbench--side-dock + --sw-dock-composer-h shortens aside.
+ * --sw-sidebar-occupied / --sw-dock-composer-h set on .workbench from layout.
+ */
+.workbench--side-expanded .main {
+  /* Keep size & subtree; only block interaction while covered by aside */
+  pointer-events: none;
+  user-select: none;
+  visibility: hidden;
+}
+
+/*
+ * Expand WITHOUT dock: completely remove in-main composer.
+ * (visibility alone can still leave a painted strip under some themes;
+ *  main[inert] would also make a visible strip unclickable.)
+ */
+.workbench--side-expanded:not(.workbench--side-dock) .composer-wrap {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+/*
+ * Docked compressed composer — portaled to document.body so main[inert]
+ * cannot block focus/clicks. Fixed bottom of free area (right of session rail).
+ * --sw-sidebar-occupied is set on the wrap itself when portaled.
+ */
+.composer-wrap.composer-wrap--side-dock,
+body > .composer-wrap.composer-wrap--side-dock {
+  position: fixed !important;
+  left: var(--sw-sidebar-occupied, 0px) !important;
+  transition: --sw-sidebar-occupied var(--motion-pane) var(--motion-pane-ease);
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  z-index: 12000;
+  width: auto !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  user-select: auto;
+  overflow: visible !important;
+  /* Tight strip — height measured → --sw-dock-composer-h on workbench */
+  padding: 6px 12px 8px !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  background: var(--bg-main) !important;
+  border-top: 1px solid var(--border-subtle);
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.composer-wrap--side-dock.is-sidebar-resizing {
+  transition: none;
+}
+
+.composer-wrap--side-dock .composer {
+  pointer-events: auto !important;
+  width: calc(100% - 8px);
+  /* Match transcript reading width; avoid min(..., none) when full. */
+  max-width: var(--chat-width-max, 800px);
+  /* Compressed chrome */
+  padding: 6px 10px 6px;
+  gap: 4px;
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.04),
+    0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+/* Side pane: full free area when no dock; bottom inset only with --sw-dock-composer-h */
+.workbench--side-expanded .aside:not(.aside--hidden) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  z-index: 40;
+  border-left: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/* Interpolate the right-aligned pane without scaling or distorting its text. */
+.workbench--side-expand-motion .aside:not(.is-resizing) {
+  transition:
+    width var(--motion-pane) var(--motion-pane-ease),
+    min-width var(--motion-pane) var(--motion-pane-ease),
+    max-width var(--motion-pane) var(--motion-pane-ease),
+    flex-basis var(--motion-pane) var(--motion-pane-ease),
+    transform var(--motion-pane) var(--motion-pane-ease),
+    box-shadow var(--motion-pane) ease,
+    border-color var(--motion-pane) ease;
+}
+
+.workbench--side-expand-motion .aside:not(.is-resizing) .aside__inner {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+/* Let the chat column yield while the full-width pane contracts. */
+.workbench--side-expand-motion .main {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Without a wallpaper, expanded panes keep the normal solid theme surface. */
+html:not([data-wallpaper="1"])
+  .workbench--side-expanded
+  .aside:not(.aside--hidden) {
+  background: var(--bg-aside) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+html:not([data-wallpaper="1"])
+  .workbench--side-expanded
+  .aside
+  .aside__inner {
+  background: var(--bg-aside) !important;
+}
+
+/* Shared right-pane chrome: same plate as the aside in rail and cover modes. */
+html:not([data-wallpaper="1"]) .aside .rp-chrome {
+  background: var(--rp-surface, transparent) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-wallpaper="1"] .aside .rp-chrome {
+  background: var(--rp-surface, transparent) !important;
+}
+
+/* Expanded pane starts at x=0 when the sidebar is hidden/overlayed. */
+.platform-mac
+  .workbench--side-expanded:has(
+    > .sidebar:is(.sidebar--hidden, .sidebar--overlay)
+  )
+  .aside
+  .sw-chrome {
+  padding-left: var(--titlebar-safe-left, 96px);
+}
+
+/* Content shells share the aside plate (files / browser / empty / persist). */
+html:not([data-wallpaper="1"])
+  .workbench--side-expanded
+  .aside
+  :is(
+    .rp.sw,
+    .sw__content,
+    .sw__empty,
+    .sw__persist-host,
+    .sw-browser,
+    .sw-browser__host,
+    .sw__files-host,
+    .sw-files,
+    .sw-skills,
+    .sw-review,
+    .sw-plan,
+    .sw-terminal,
+    .sw-terminal--pty
+  ) {
+  background: var(--rp-surface, transparent) !important;
+}
+
+.workbench--side-expanded .aside .sw__files-host,
+.workbench--side-expanded .aside .sw-files {
+  background: var(--rp-surface, transparent) !important;
+}
+
+.workbench--side-expanded.workbench--side-dock .aside:not(.aside--hidden) {
+  bottom: var(--sw-dock-composer-h, 96px);
+}
+
+.workbench--side-expanded .aside-resizer {
+  display: none !important;
+}
+
+/* Full height chain: .aside → .aside__inner → .rp.sw → content → files */
+.aside__inner > .rp.sw,
+.aside__inner .rp.sw {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Card bg would leave a hard edge under transparent xterm — stay skin-native */
+  background: transparent;
+  box-shadow: none;
+}
+
+.sw.rp {
+  /* height fill above; .rp base also sets column flex */
+  background: transparent;
+  box-shadow: none;
+}
+
+/*
+ * Tabs + plus stick together (Codex):
+ *   [ tab ][ tab ][ + ]  ………drag………  [ expand ][ side ]
+ * Tabs cluster sizes to content; empty gap is .sw-chrome__drag (window move).
+ *
+ * Do NOT set max-width: calc(100% - 36px) on the scroll strip when the cluster
+ * is content-sized — that circular constraint under-sizes the strip and clips
+ * the last tab’s right border-radius against overflow.
+ */
+.sw-tabs-cluster {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+  /* Leave room for expand + side-toggle (~72px) so close stays on-screen when
+   * the pane is squeezed on a non-maximized window. */
+  max-width: calc(100% - 72px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  /* visible: avoid clipping tab chip border-radius; fade masks still work */
+  overflow: visible;
+}
+
+/* Titlebar drag filler — blank area between tab cluster and right actions */
+.sw-chrome__drag {
+  flex: 1 1 auto;
+  min-width: 8px;
+  align-self: stretch;
+  height: 100%;
+}
+
+/* Scroll only the tab chips; width follows content; shrink+scroll when tight */
+.sw-tabs-cluster .sw-tabs__scroll,
+.sw-tabs-cluster .rp-tabs__scroll {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+}
+
+.sw-tabs-cluster .rp-tabs__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.sw-plus {
+  flex-shrink: 0;
+}
+
+/* Overflow fade on the scroll edge (image-3) */
+.sw-tabs--fade-l::before,
+.sw-tabs--fade-r::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sw-tabs--fade-l::before {
+  left: 0;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--bg-hover) 40%, var(--bg-card)) 0%,
+    transparent 100%
+  );
+}
+
+.sw-tabs--fade-r::after {
+  /* just before the + button */
+  right: 34px;
+  background: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--bg-hover) 40%, var(--bg-card)) 0%,
+    transparent 100%
+  );
+}
+
+.sw__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sw__empty {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 16px;
+}
+
+.sw__files-host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sw__files-host[hidden] {
+  display: none !important;
+}
+
+/* Files workspace fills the host and shares the aside plate. */
+.sw__files-host,
+.sw-files {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--rp-surface, transparent);
+}
+
+.sw-files .rp-split {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--rp-surface, transparent);
+}
+
+.sw-files .rp-split__preview {
+  background: var(--rp-surface, transparent);
+}
+
+/* Divider is only the shared .rp-split__resizer line — no tree border-left
+ * (avoids the double vertical line between preview and file tree). */
+.sw-files .rp-split__tree {
+  background: var(--rp-surface, transparent);
+  border-left: none;
+}
+
+/* 1px hairline (base resizer draws 2px — too heavy next to solid panes). */
+.sw-files .rp-split__resizer::after {
+  left: 2px;
+  width: 1px;
+}
+
+.sw-files .rp-files-toolbar {
+  background: var(--rp-surface, transparent);
+}
+
+.sw__files-host .rp--embedded,
+.sw-files.rp--embedded {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  background: var(--rp-surface, transparent);
+}
+
+/*
+ * Side picker rows — shared item chrome only.
+ * Width is NOT shared between empty-state card and + dropdown (see modifiers).
+ */
+.sw-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+}
+
+.sw-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  white-space: nowrap;
+  transform: translateZ(0);
+}
+
+.sw-picker__item:hover,
+.sw-picker__item:focus-visible {
+  background: var(--bg-hover, var(--menu-hover));
+  outline: none;
+}
+
+.sw-picker__ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+}
+
+.sw-picker__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.sw-picker__shortcut {
+  flex-shrink: 0;
+  margin-left: 20px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  opacity: 0.5;
+  color: var(--text-tertiary);
+}
+
+/*
+ * Empty-state card (center of side pane when no tabs).
+ * Follows card opacity (--ui-opacity-mix). The + dropdown (.sw-plus-menu) does not.
+ */
+.sw-picker--empty {
+  width: min(280px, calc(100% - 32px));
+  min-width: min(260px, 100%);
+  max-width: min(300px, calc(100% - 24px));
+  padding: 8px;
+  border-radius: 12px;
+  position: relative;
+  border: 1px solid var(--glass-border, var(--border-subtle));
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.sw-picker--empty::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated, var(--bg-card)) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sw-picker--empty > * {
+  position: relative;
+  z-index: 1;
+}
+
+.sw-picker--empty .sw-picker__item {
+  min-height: 40px;
+  padding: 10px 14px;
+}
+
+.sw-picker--empty .sw-picker__shortcut {
+  margin-left: 28px;
+}
+
+/*
+ * + dropdown list only (portaled .sw-plus-menu).
+ * Global menu rule: width = widest row + padding. Independent of empty card.
+ */
+.sw-picker--compact {
+  width: max-content;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sw-plus-menu.menu-panel,
+.menu-panel.sw-plus-menu {
+  z-index: 13000;
+  width: max-content;
+  min-width: 0;
+  max-width: min(var(--menu-max-width, 360px), calc(100vw - 16px));
+  /* Solid menu plate — not the card opacity slider. */
+  background: var(--menu-context-bg, var(--bg-elevated, var(--bg-card))) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--menu-context-border, var(--border-subtle));
+  box-shadow: var(--menu-context-shadow, 0 8px 28px rgba(0, 0, 0, 0.45));
+  border-radius: 12px;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+/* Keep dropdown rows compact even if empty-card item overrides exist later */
+.sw-plus-menu .sw-picker--compact .sw-picker__item {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.sw-plus-menu .sw-picker--compact .sw-picker__shortcut {
+  margin-left: 20px;
+}
+
+/* Dual-row files toolbar (image-5/6) — under shared .rp-chrome */
+.rp-files-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--rp-surface, transparent);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.rp-files-toolbar__crumbs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rp-files-toolbar__editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.rp-files-toolbar .rp-editor__tool-btn {
+  flex-shrink: 0;
+}
+
+.rp-files-toolbar .rp-editor__dirty-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-files-toolbar__crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.rp-files-toolbar__crumb {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.rp-files-toolbar__crumb.is-current {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.rp-files-toolbar__muted {
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-files-toolbar__sep {
+  opacity: 0.4;
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* Tree toggle + 打开 on the RIGHT (image-5/6) */
+.rp-files-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Browser / terminal — fill pane; chrome from embedded-browser / rp-tree-search */
+.sw-browser,
+.sw-terminal,
+.sw-review,
+.sw-plan {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/*
+ * `.plan-resource-empty` is also the Resources document empty (max-width
+ * 28rem, start-aligned). As a column flex child that cap left-aligns the
+ * block in a wide side pane. Stretch the shell and keep copy centered so
+ * title / hint / CTA sit in the panel.
+ */
+.sw-plan .plan-resource-empty {
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.sw-browser__url-wrap {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.sw-browser__host {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Nested EmbeddedBrowser already has its own bar — hide duplicate when we own URL bar.
+ * Keep the progress strip visible so navigations are never a silent white panel. */
+.sw-browser__host .embedded-browser__bar {
+  display: none;
+}
+
+.sw-browser__host .embedded-browser {
+  flex: 1;
+  min-height: 0;
+}
+
+.sw-browser__host .embedded-browser__progress {
+  /* Sit flush under the side tab address bar */
+  z-index: 1;
+}
+
+/* Design Mode inspector — React chrome under the address bar */
+.sw-dm {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated, var(--bg-card));
+  color: var(--text-secondary);
+  max-height: 46%;
+  overflow: auto;
+}
+
+.sw-dm--open {
+  gap: 8px;
+  padding-bottom: 10px;
+}
+
+.sw-dm__hint,
+.sw-dm__banner,
+.sw-dm__sub {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sw-dm__banner {
+  color: var(--text-secondary);
+}
+
+.sw-dm__sub {
+  font-size: 11px;
+  color: var(--text-muted, var(--text-tertiary));
+}
+
+.sw-dm__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sw-dm__ident {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sw-dm__sel {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-dm__path,
+.sw-dm__text {
+  font-size: 11px;
+  color: var(--text-muted, var(--text-tertiary));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-dm__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted, var(--text-tertiary));
+  min-width: 0;
+}
+
+.sw-dm__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sw-dm__styles {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 3px 10px;
+  font-size: 11px;
+}
+
+.sw-dm__row {
+  display: contents;
+}
+
+.sw-dm__styles dt {
+  color: var(--text-muted, var(--text-tertiary));
+  font-weight: 500;
+}
+
+.sw-dm__styles dd {
+  margin: 0;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sw-dm__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.sw-dm__note textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 44px;
+  max-height: 96px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--bg-input, var(--bg-card));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.sw-dm__note textarea:focus {
+  border-color: var(--border-focus, var(--accent, #3b82f6));
+}
+
+.sw-dm__note textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.sw-dm__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sw-dm__text-btn,
+.sw-dm__shot,
+.sw-dm__send {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 7px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.sw-dm__text-btn:hover,
+.sw-dm__shot:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sw-dm__shot {
+  border-color: var(--border-subtle);
+}
+
+.sw-dm__shot.is-on {
+  color: var(--text-primary);
+  background: var(--bg-active, var(--bg-hover));
+  border-color: var(--border-subtle);
+}
+
+.sw-dm__shot:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sw-dm__send {
+  background: var(--bg-active, var(--bg-hover));
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+  font-weight: 600;
+}
+
+.sw-dm__send:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.sw-dm__send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Persist browser/terminal hosts across tab switches (keep PTY/xterm alive) */
+.sw__persist-host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sw__persist-host[hidden] {
+  display: none !important;
+}
+
+/*
+ * Interactive PTY terminal — edge-to-edge fill.
+ * Host shares the aside plate (not a second 50% veil). Canvas stays
+ * transparent so FitAddon leftover px match the rest of the pane.
+ */
+.sw-terminal--pty {
+  --sw-term-veil: var(--rp-surface, transparent);
+  /* Inner text inset; FitAddon subtracts .xterm padding. Host stays 0. */
+  --sw-term-pad: 5px;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--sw-term-veil);
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+}
+
+html[data-theme="light"] .sw-terminal--pty {
+  --sw-term-veil: var(--rp-surface, transparent);
+}
+
+/* Cwd / empty honesty strip above xterm (not a second chrome bar). */
+.sw-terminal__notice {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-elevated, var(--bg-secondary, #1e1e1e)) 88%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border, #333) 70%, transparent);
+}
+
+.sw-terminal__notice.rp__error {
+  color: var(--text-danger, var(--danger, #f87171));
+}
+
+.sw-terminal__notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.sw-terminal__restart {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.sw-terminal__restart:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sw-terminal__restart--inline {
+  margin-left: 0;
+}
+
+/* Host stays edge-to-edge so the pty veil still paints the full pane.
+ * Text inset lives on `.xterm` (FitAddon subtracts that padding). */
+.sw-terminal__xterm {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: transparent;
+  box-shadow: none;
+  --vscode-scrollbar-shadow: transparent;
+}
+
+/* xterm default CSS paints #000 on viewport/helpers + scrollbar inset shadows. */
+.sw-terminal__xterm .xterm {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  padding: var(--sw-term-pad, 5px) !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  /* Coding ligatures collapse Powerline / `>` runs in JetBrains Mono. */
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+.sw-terminal__xterm .xterm-viewport {
+  width: 100% !important;
+  /* Full host height so leftover px under last row stay in-pane */
+  height: 100% !important;
+  min-height: 100% !important;
+  background-color: transparent !important;
+  background: transparent !important;
+  overflow-y: auto !important;
+  box-shadow: none !important;
+}
+
+.sw-terminal__xterm .xterm-screen {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Helpers are absolute to the padding box; offset them onto the screen. */
+.sw-terminal__xterm .xterm-helpers {
+  top: var(--sw-term-pad, 5px) !important;
+  left: var(--sw-term-pad, 5px) !important;
+}
+
+.sw-terminal__xterm .xterm-helpers,
+.sw-terminal__xterm .xterm-helper-textarea {
+  background: transparent !important;
+  box-shadow: none !important;
+}

@@ -1,0 +1,828 @@
+/* lobe-chat css chunk */
+/**
+ * Chat transcript — pixel-matched to Cursor agent message card (ref screenshot).
+ * Dark-first soft surfaces, path/code chrome, file links, file cards.
+ */
+
+.lobe-chat {
+  /* Type — follow Appearance → UI font (`--font-sans` on documentElement).
+   * A second hardcoded sans stack made the transcript ignore the picker
+   * and force YaHei on Windows (no JhengHei). Code stays `--chat-mono`. */
+  --chat-font: var(--font-sans);
+  --chat-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Defaults = md; overridden by html[data-chat-font] (Appearance). */
+  --chat-fs: 14px;
+  --chat-fs-sm: 12.5px;
+  --chat-fs-xs: 11.5px;
+  /* Code block font; overridden by html[data-code-font] (Appearance). */
+  --code-fs: 12.5px;
+  --chat-lh: 1.65;
+  --chat-lh-sm: 1.5;
+
+  /* Density = comfortable; overridden by html[data-chat-density] (Appearance). */
+  --chat-list-gap: 4px;
+  --chat-item-pad-block: 10px;
+  --chat-item-gap: 8px;
+  --chat-item-body-gap: 10px;
+  --chat-bubble-pad-y: 10px;
+  --chat-bubble-pad-x: 14px;
+
+  --chat-r: 10px;
+  --chat-r-lg: 12px;
+  --chat-r-sm: 8px;
+
+  /*
+   * Default = follow app design tokens (tokens.css on html[data-theme]).
+   * Do NOT pin dark via `:root .lobe-chat` — that forced dark code chrome in
+   * light theme and made fenced code unreadable (dark bg + wrong fg).
+   */
+  --chat-text: var(--text-primary, #e8e8ea);
+  --chat-text-2: var(--text-secondary, #a1a1a6);
+  --chat-text-3: var(--text-tertiary, #6e6e73);
+  --chat-link: var(--accent, #6db3f2);
+  --chat-link-hover: var(--accent-hover, #8fc4f5);
+  --chat-bg: transparent;
+  /* Code surfaces: always pair bg + fg from the active theme */
+  --chat-code-bg: var(--bg-code, #1e1e22);
+  --chat-code-fg: var(--text-primary, #e8e8ea);
+  --chat-code-bar: color-mix(
+    in srgb,
+    var(--chat-code-bg) 88%,
+    var(--chat-text) 12%
+  );
+  --chat-code-border: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  --chat-inline-code-bg: color-mix(
+    in srgb,
+    var(--chat-code-bg) 70%,
+    transparent
+  );
+  --chat-inline-code-fg: var(--chat-code-fg);
+  --chat-bubble: var(--bg-user-bubble, rgba(255, 255, 255, 0.08));
+  --chat-card: var(--bg-card, #2a2a2e);
+  --chat-card-border: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  --chat-card-hover: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  --chat-divider: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  --chat-success: var(--success, #3ecf8e);
+  --chat-danger: var(--danger, #f07178);
+  --chat-tag-bg: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  --chat-icon-btn: var(--text-secondary, rgba(255, 255, 255, 0.55));
+  --chat-icon-btn-hover: var(--text-primary, rgba(255, 255, 255, 0.9));
+
+  font-family: var(--chat-font);
+  font-size: var(--chat-fs);
+  line-height: var(--chat-lh);
+  color: var(--chat-text);
+}
+
+/* Optional dark polish (slightly softer code well than pure --bg-code) */
+[data-theme="dark"] .lobe-chat {
+  --chat-code-bg: color-mix(in srgb, var(--bg-code, #0a0a0a) 55%, #2a2a2e);
+  --chat-code-fg: var(--text-primary, #e8e8ea);
+  /* 与输入框共用同一个行内代码底色 token（tokens.css）。 */
+  --chat-inline-code-bg: var(--md-inline-code-bg, rgba(255, 255, 255, 0.14));
+  --chat-inline-code-fg: var(--chat-code-fg);
+}
+
+/* Light: elevated soft gray code well + dark ink (never dark-on-dark) */
+[data-theme="light"] .lobe-chat {
+  --chat-code-bg: var(--bg-code, #f0f0f2);
+  --chat-code-fg: var(--text-primary, #1d1d1f);
+  --chat-code-bar: color-mix(in srgb, var(--chat-code-bg) 92%, #000 8%);
+  --chat-code-border: var(--border-subtle, rgba(0, 0, 0, 0.08));
+  --chat-inline-code-bg: var(--md-inline-code-bg, rgba(0, 0, 0, 0.09));
+  --chat-inline-code-fg: var(--chat-code-fg);
+  --chat-bubble: var(--bg-user-bubble, rgba(0, 0, 0, 0.05));
+  --chat-card: var(--bg-card, #f5f5f7);
+  --chat-card-border: var(--border-subtle, rgba(0, 0, 0, 0.08));
+  --chat-card-hover: var(--bg-hover, rgba(0, 0, 0, 0.03));
+  --chat-icon-btn: var(--text-secondary, rgba(0, 0, 0, 0.45));
+  --chat-icon-btn-hover: var(--text-primary, rgba(0, 0, 0, 0.85));
+}
+
+/* ── Shell ── */
+.lobe-chat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: var(--chat-bg);
+  color: var(--chat-text);
+  /* Named container lives on the column, not the overflow scroller.
+   * inline-size containment on the scrollport is a WebView2 main-thread
+   * scrolling reason (slow finger pans hitch with zero JS commits). */
+  container-type: inline-size;
+  container-name: chat-scroll;
+}
+
+.lobe-chat__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* none: kill elastic rubber-band at the locked bottom (macOS trackpad
+   * overscroll looked like "can pull a little then snap back + flash"). */
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  /* We manage stick-to-bottom ourselves; browser anchoring fights
+   * programmatic scrollTop during stream growth and feels like bounce. */
+  overflow-anchor: none;
+  /* Reserve gutter so image max-width / text wrap don't thrash when the
+   * scrollbar appears mid-load (classic width↔height oscillation).
+   * Must beat `*:not(textarea) { scrollbar-width: none }` or the gutter
+   * collapses to 0 and the thumb covers cards when the aside squeezes
+   * this column to ~chat-width-max. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) transparent
+    !important;
+  -ms-overflow-style: auto !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar {
+  display: block !important;
+  width: var(--scrollbar-size, 8px) !important;
+  height: var(--scrollbar-size, 8px) !important;
+  background: transparent !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-track,
+.lobe-chat__scroll::-webkit-scrollbar-track-piece,
+.lobe-chat__scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.lobe-chat__scroll::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb, rgba(128, 128, 128, 0.35)) !important;
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background-clip: padding-box !important;
+  min-height: 28px;
+}
+
+/* Scroll-perf: while a gesture/fling is in motion the virtualizer flags the
+ * scroller; killing pointer events on content stops per-frame :hover style
+ * recalc (content moves under a stationary cursor → hover re-resolution can
+ * burn 10ms+ of style/layout per frame that JS profiling cannot see).
+ * Wheel still targets the scroller itself, so scrolling is unaffected.
+ *
+ * Direct-child selector on purpose (NOT `[data-scrolling="1"] *`): the
+ * universal-descendant form made every attribute flip re-run selector
+ * matching over the whole transcript DOM (a 100ms+ style recalc on long
+ * chats). pointer-events is an inherited property that Blink propagates via
+ * the independent-property fast path, so flipping it on the children is
+ * near-free and still disables hover for the entire subtree. Descendants
+ * with explicit `pointer-events: auto` (rail steps, pinned action bars)
+ * stay interactive, which is acceptable. */
+.lobe-chat__scroll[data-scrolling="1"] > * {
+  pointer-events: none;
+}
+
+.lobe-chat__inner {
+  box-sizing: border-box;
+  width: 100%;
+  /* Default = medium; overridden by html[data-chat-width] (Appearance). */
+  max-width: var(--chat-width-max, 800px);
+  margin: 0 auto;
+  padding: 20px 20px 8px;
+  /*
+   * Extra end pad only when the reading column fills the scrollport
+   * (aside squeeze). Wide panes already gap the centered 800px column
+   * from the far-right thumb — (100cqi - max) / 2 eats the extra.
+   */
+  padding-inline-end: max(
+    20px,
+    calc(
+      20px + var(--scrollbar-size, 8px) + 6px -
+        max(0px, (100cqi - var(--chat-width-max, 800px)) / 2)
+    )
+  );
+  display: flex;
+  flex-direction: column;
+  gap: var(--chat-list-gap, 4px);
+  contain: layout style;
+}
+
+/*
+ * Real box in the scroll height (not only padding-bottom on this column).
+ * WKWebView often omits inner padding from scrollHeight, so stick-to-bottom
+ * parks the last lines under the floating composer. This spacer is what
+ * "at the bottom" actually clears.
+ */
+.lobe-chat__end-pad {
+  flex-shrink: 0;
+  width: 100%;
+  height: calc(var(--composer-float-pad, 168px) + 20px);
+  pointer-events: none;
+}
+
+html[data-chat-width="full"] .lobe-chat__inner,
+.lobe-chat[data-chat-width="full"] .lobe-chat__inner {
+  /* --chat-width-max: none makes the calc above invalid. Always full-bleed. */
+  padding-inline-end: calc(20px + var(--scrollbar-size, 8px) + 6px);
+}
+
+/* Historical open: paint media off-screen until cards have a real box,
+ * then scroll-to-bottom once and reveal. */
+.lobe-chat[data-open-hold="1"] .lobe-chat__inner {
+  visibility: hidden;
+}
+.lobe-chat[data-open-hold="1"] .lobe-msg-rail,
+.lobe-chat[data-open-hold="1"] .lobe-chat-back-bottom {
+  visibility: hidden;
+}
+.lobe-chat__open-hold {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  min-height: 0;
+  background: var(--chat-bg);
+}
+
+/* ── Message rows ── */
+.lobe-chat-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  padding-block: var(--chat-item-pad-block, 10px);
+  gap: var(--chat-item-gap, 8px);
+  /* Inner is a column flex; shrinking rows stacked answer text on tool stdout. */
+  flex-shrink: 0;
+  /* Isolate layout so stream growth on the tail row dirties less of the
+   * surrounding tree during markdown reflow (Intel Retina). Avoid
+   * content-visibility here — the list is already virtualized.
+   * paint: keep one tall article from compositing the whole transcript. */
+  contain: layout style paint;
+}
+
+.lobe-chat-item--user {
+  align-items: flex-end;
+  padding-inline-start: 0;
+}
+
+.lobe-chat-item--assistant {
+  align-items: stretch;
+}
+
+.lobe-chat-item--shell {
+  contain: strict;
+  pointer-events: none;
+  box-sizing: border-box;
+  margin-inline: 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--chat-text, #888) 6%, transparent);
+}
+
+.lobe-chat-item__header {
+  display: none; /* no avatars / titles */
+}
+
+.lobe-chat-item__body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chat-item-body-gap, 10px);
+  max-width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.lobe-chat__virt-spacer {
+  contain: strict;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lobe-chat-item--assistant .lobe-chat-item__body {
+  width: 100%;
+}
+
+/* User bubble — soft fill, 12px radius; keep input newlines / blank lines */
+.lobe-chat-bubble {
+  max-width: min(100%, 36rem);
+  padding: var(--chat-bubble-pad-y, 10px) var(--chat-bubble-pad-x, 14px);
+  position: relative;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--chat-text);
+  font-size: var(--chat-fs);
+  line-height: var(--chat-lh);
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: none;
+  box-shadow: none;
+}
+
+.lobe-chat-bubble::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--chat-bubble) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lobe-chat-bubble > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Plain / skill-mixed user body — same newline policy as the composer */
+.lobe-chat-bubble .user-msg-body,
+.lobe-chat-user-msg__body .user-msg-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lobe-chat-bubble .user-msg-body__text {
+  white-space: pre-wrap;
+}
+
+
+.lobe-chat-bubble--interjection {
+  border: 1px solid color-mix(in srgb, var(--chat-link) 24%, transparent);
+  background: transparent;
+}
+
+.lobe-chat-bubble--interjection::before {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--chat-link) 8%, var(--chat-bubble))
+      var(--ui-opacity-mix, 100%),
+    transparent
+  );
+}
+
+/* A turn the Host started on its own (wake / external send): a quiet
+   continuation line instead of a user bubble, so the chat never reads as the
+   user having spoken — the answer below stays attached to the turn above. */
+.lobe-chat-auto-wake {
+  align-self: stretch;
+  margin: 4px 2px 6px;
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid
+    color-mix(in srgb, var(--chat-link) 32%, transparent);
+  color: color-mix(in srgb, var(--chat-link) 62%, var(--chat-text));
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lobe-chat-interjection-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-block-end: 6px;
+  color: color-mix(in srgb, var(--chat-link) 78%, var(--chat-text));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
+.lobe-chat-interjection-tag svg {
+  flex: 0 0 auto;
+}
+
+/* Scheduled automation user card: clock tag + body */
+.lobe-chat-user-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  white-space: normal;
+}
+
+.lobe-chat-user-msg__body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  width: 100%;
+}
+
+.lobe-scheduled-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--chat-text-2, var(--text-secondary, #a1a1aa));
+  background: color-mix(in srgb, var(--chat-text, #fff) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chat-text, #fff) 12%, transparent);
+  white-space: nowrap;
+}
+
+.lobe-scheduled-tag__icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.lobe-scheduled-tag__kind {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.lobe-scheduled-tag__sep {
+  flex-shrink: 0;
+  opacity: 0.45;
+}
+
+.lobe-scheduled-tag__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--chat-text, inherit);
+  font-weight: 550;
+}
+
+/* Remote IM journaled user turn — same pill as scheduled, subtle accent */
+.lobe-remote-im-tag {
+  color: color-mix(
+    in srgb,
+    var(--accent, #60a5fa) 72%,
+    var(--chat-text-2, #a1a1aa)
+  );
+  background: color-mix(in srgb, var(--accent, #60a5fa) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent, #60a5fa) 28%, transparent);
+}
+
+.lobe-remote-im-tag .lobe-scheduled-tag__title {
+  color: var(--chat-text, inherit);
+}
+
+/* Message actions stay visible (default). Hover is opt-in via Appearance. */
+.lobe-chat-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Settings → Appearance: show on hover / focus-within (keyboard a11y) */
+html[data-msg-actions="hover"] .lobe-chat-item__actions {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+html[data-msg-actions="hover"] .lobe-chat-item:hover .lobe-chat-item__actions,
+html[data-msg-actions="hover"]
+  .lobe-chat-item:focus-within
+  .lobe-chat-item__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lobe-chat-item--user .lobe-chat-item__actions {
+  justify-content: flex-end;
+}
+
+.lobe-chat-action-time {
+  font-size: 11px;
+  line-height: 28px;
+  color: var(--chat-text-3, var(--text-tertiary));
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  padding-inline: 4px 2px;
+  white-space: nowrap;
+}
+
+/* Settings → Appearance: muted word/char count under finished assistant replies */
+.lobe-chat-reply-length {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--chat-text-3, var(--text-tertiary));
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* Turn changed-files strip (#998) — solid surface, opens Changes aside */
+.lobe-turn-changed {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated, var(--chat-card-bg, var(--bg-secondary))) 92%,
+    transparent
+  );
+  max-width: min(100%, 36rem);
+}
+
+.lobe-turn-changed__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+.lobe-turn-changed__icon {
+  flex-shrink: 0;
+  color: var(--chat-text-3, var(--text-tertiary));
+}
+
+.lobe-turn-changed__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--chat-text-2, var(--text-secondary));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobe-turn-changed__view-all {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  margin: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--accent, var(--text-link, #60a5fa));
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.lobe-turn-changed__view-all:hover {
+  text-decoration: underline;
+}
+
+.lobe-turn-changed__view-all:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 1px;
+}
+
+.lobe-turn-changed__chips,
+.lobe-turn-changed__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lobe-turn-changed__card {
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-hover, rgba(127, 127, 127, 0.1));
+  overflow: hidden;
+}
+
+.lobe-turn-changed__card--open {
+  background: var(
+    --bg-elevated,
+    var(--chat-card-bg, var(--bg-secondary, rgba(127, 127, 127, 0.12)))
+  );
+}
+
+.lobe-turn-changed__card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lobe-turn-changed__card-head:hover {
+  background: var(--chat-card-hover, var(--bg-active, rgba(127, 127, 127, 0.12)));
+}
+
+.lobe-turn-changed__card-head:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: -2px;
+}
+
+.lobe-turn-changed__card-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobe-turn-changed__delta {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  color: var(--chat-text-2, var(--text-secondary));
+}
+
+.lobe-turn-changed__chev {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--chat-text-3, var(--text-tertiary));
+}
+
+.lobe-turn-changed__preview {
+  border-top: 1px solid var(--border-subtle);
+  padding: 6px 0 8px;
+}
+
+.lobe-turn-changed__preview-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 8px 4px;
+}
+
+.lobe-turn-changed__diff {
+  max-height: 280px;
+  overflow: auto;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.lobe-turn-changed__empty,
+.lobe-turn-changed__truncated {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  color: var(--chat-text-2, var(--text-secondary));
+}
+
+.lobe-turn-changed__open-review {
+  display: block;
+  width: calc(100% - 12px);
+  margin: 4px 6px 0;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--accent, var(--text-link, #60a5fa));
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 550;
+  cursor: pointer;
+  text-align: center;
+}
+
+.lobe-turn-changed__open-review:hover {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.1));
+  text-decoration: underline;
+}
+
+.lobe-turn-changed__open-review:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 1px;
+}
+
+.lobe-turn-changed__chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: min(100%, 12rem);
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-hover, rgba(127, 127, 127, 0.1));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lobe-turn-changed__chip:hover {
+  background: var(--chat-card-hover, var(--bg-active, rgba(127, 127, 127, 0.16)));
+  border-color: color-mix(in srgb, var(--border-subtle) 60%, var(--text-secondary));
+}
+
+.lobe-turn-changed__chip:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 1px;
+}
+
+.lobe-turn-changed__chip--static {
+  cursor: default;
+}
+
+.lobe-turn-changed__chip--more {
+  color: var(--chat-text-2, var(--text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+
+.lobe-chat-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--chat-icon-btn);
+  cursor: pointer;
+}
+.lobe-chat-action:hover {
+  background: var(--chat-card-hover);
+  color: var(--chat-icon-btn-hover);
+}
+.lobe-chat-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.lobe-chat-action:disabled:hover {
+  background: transparent;
+  color: var(--chat-icon-btn);
+}
+.lobe-chat-action.is-copied {
+  color: var(--success, #3ecf8e);
+}
+
+/* Regenerate: primary refresh + optional model chevron (split control). */
+.lobe-chat-regen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  vertical-align: middle;
+}
+.lobe-chat-regen .lobe-chat-action {
+  border-radius: 8px;
+}
+.lobe-chat-regen__chevron {
+  width: 20px;
+  margin-inline-start: -2px;
+}
+
+/* ── Markdown body ── */
+.chat-md,
+.lobe-chat-md {
+  font-size: var(--chat-fs);
+  line-height: var(--chat-lh);
+  color: var(--chat-text);
+  word-break: break-word;
+  min-width: 0;
+}
+
+.chat-md > *:first-child {
+  margin-top: 0;
+}
+.chat-md > *:last-child {
+  margin-bottom: 0;
+}
+
+.chat-md p {
+  margin: 0 0 0.85em;
+  line-height: var(--chat-lh);
+}
+.chat-md p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-md .katex {
+  font-size: 1.05em;
+}
+
+.chat-md .katex-display {
+  margin: 0.65em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}

@@ -1,0 +1,722 @@
+/* lobe-chat css chunk */
+
+/* Worked for 1m 2s ∨ — same chrome size as thought / steps (13px) */
+.grok-act__header {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--grok-act-gap, 8px);
+  margin: 0 0 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--grok-act-fg-dim);
+  font-size: var(--grok-act-font, 13px);
+  font-weight: 400;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  text-align: left;
+}
+.grok-act__header:hover {
+  color: var(--grok-act-fg);
+}
+.grok-act__header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--grok-act-icon, 16px);
+  height: var(--grok-act-icon, 16px);
+  color: var(--grok-act-fg);
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+.grok-act__header:hover .grok-act__header-icon {
+  opacity: 1;
+}
+.grok-act__header-text {
+  min-width: 0;
+}
+.grok-act__header-caret {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.grok-act__excerpt {
+  display: flex;
+  flex-direction: column;
+}
+.grok-act__excerpt-more {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 2px 0 2px calc(var(--grok-act-icon, 16px) + var(--grok-act-gap, 8px));
+  border: none;
+  background: transparent;
+  color: var(--chat-danger, #c44);
+  font-size: var(--grok-act-font, 13px);
+  font-weight: 400;
+  line-height: 1.45;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.grok-act__excerpt-more:hover {
+  text-decoration: underline;
+}
+
+.grok-act__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+/* Long step lists: max-height scroller so expand / live cannot dump
+   dozens of rows into the transcript (stick-to-bottom flash).
+   Mapped (capped) lists are variable-height — keep this taller than the
+   old 12×30=360 box and never flex-shrink children (that stacked rows). */
+.grok-act__steps--capped {
+  max-height: min(70vh, 40rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+.grok-act__steps--virtual {
+  max-height: 648px; /* fallback; inline style sets min(18, n) * 36 */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+.grok-act__steps--virtual .grok-act__step {
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.grok-act__steps--virtual .grok-act__main {
+  padding-bottom: 0;
+  justify-content: center;
+}
+.grok-act__steps--virtual .grok-act__icon-col {
+  padding-top: 10px; /* center 16px icon in 36px row */
+}
+.grok-act__steps--virtual .grok-act__step.is-last .grok-act__main {
+  padding-bottom: 0;
+}
+
+/* One step row — icon | continuous rail + label */
+.grok-act__step {
+  display: flex;
+  align-items: stretch;
+  gap: var(--grok-act-gap, 8px);
+  width: 100%;
+  min-height: 0;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--grok-act-fg);
+  font-size: var(--grok-act-font, 13px);
+  line-height: 1.4;
+  font-weight: 400;
+  font-family: inherit;
+  /* Scroll-perf: rows outside the viewport inside a tall "Worked for …"
+   * phase skip style/layout/paint entirely. `auto 36px` remembers the real
+   * size once rendered; 36px matches GROK_ACTIVITY_STEP_ROW_PX for rows
+   * never rendered yet. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 36px;
+}
+/* Expanded / speech rows cannot keep the collapsed 36px intrinsic size.
+ * WebView2 then paints the title, command, and child steps in one box
+ * (stacked glyphs on the last tool). */
+.grok-act__step.is-expanded,
+.grok-act__step[data-expanded="1"],
+.grok-act__step--speech {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+  min-height: min-content;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+.grok-act__steps--virtual .grok-act__step.is-expanded,
+.grok-act__steps--virtual .grok-act__step[data-expanded="1"],
+.grok-act__steps--virtual .grok-act__step--speech {
+  height: auto;
+  min-height: min-content;
+  max-height: none;
+  overflow: visible;
+}
+.grok-act__step.is-error {
+  color: var(--chat-danger, #c44);
+}
+.grok-act__step.is-running .grok-act__label-text,
+.grok-act__step.is-running .grok-act__label {
+  opacity: 0.9;
+}
+
+.grok-act__icon-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--grok-act-icon, 16px);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.grok-act__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--grok-act-icon, 16px);
+  height: var(--grok-act-icon, 16px);
+  color: var(--grok-act-fg);
+  flex-shrink: 0;
+  z-index: 1;
+  opacity: 0.85;
+}
+.grok-act__step.is-error .grok-act__icon {
+  color: var(--chat-danger, #c44);
+  opacity: 1;
+}
+.grok-act__step.is-running .grok-act__icon {
+  animation: chat-live-pulse 1.2s ease-in-out infinite;
+}
+
+/* Vertical connector — continuous, 1px, light gray */
+.grok-act__rail {
+  flex: 1 1 auto;
+  width: 1px;
+  min-height: 10px;
+  margin: 4px 0 0;
+  background: var(--grok-act-rail);
+}
+
+.grok-act__main {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.grok-act__step.is-last .grok-act__main {
+  padding-bottom: 2px;
+}
+
+.grok-act__label-row {
+  display: flex;
+  align-items: center;
+  gap: var(--grok-act-gap, 8px);
+  min-width: 0;
+  width: 100%;
+}
+
+/* Bare tool row + phase step text share the same type ramp */
+.grok-act__label,
+.grok-act__label-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+  font-size: var(--grok-act-font, 13px);
+  line-height: 1.4;
+  color: var(--grok-act-fg);
+  font-family: inherit;
+}
+
+/* Expandable bare tool button — keep label + caret on one row */
+.grok-act__step-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.grok-act__step-btn--grow {
+  flex: 1;
+  width: 100%;
+}
+.grok-act__mini-caret {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.75;
+  flex-shrink: 0;
+  transition: transform 0.12s ease;
+}
+.grok-act__mini-caret.is-open {
+  transform: rotate(90deg);
+}
+
+/* “Read file · main.ts” companion basename — muted, same size */
+.grok-act__label-path {
+  color: var(--grok-act-fg-dim);
+}
+
+/* “Browsed ” / “Searched web for ” same weight; url/query not bold */
+.grok-act__label-prefix {
+  font-weight: 400;
+}
+.grok-act__label-url,
+.grok-act__label-query {
+  font-weight: 400;
+}
+
+/* Right meta: “10 results” + favicon stack */
+.grok-act__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--grok-act-fg-dim);
+  font-size: var(--grok-act-font, 13px);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.grok-act__meta-count {
+  opacity: 0.95;
+}
+.grok-act__favicons {
+  display: inline-flex;
+  align-items: center;
+  flex-direction: row-reverse;
+}
+.grok-act__favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--chat-bg, #fff);
+  border: 1.5px solid color-mix(in srgb, var(--chat-border, #e5e5e5) 80%, transparent);
+  object-fit: cover;
+  margin-left: -6px;
+  box-sizing: border-box;
+}
+.grok-act__favicon:last-child {
+  margin-left: 0;
+}
+
+/* Live footer — same icon column + type as steps */
+.grok-act__working {
+  display: flex;
+  align-items: center;
+  gap: var(--grok-act-gap, 8px);
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--grok-act-fg);
+  font-size: var(--grok-act-font, 13px);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  font-family: inherit;
+}
+.grok-act__working-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--grok-act-icon, 16px);
+  height: var(--grok-act-icon, 16px);
+  color: var(--grok-act-fg);
+  opacity: 0.85;
+  flex-shrink: 0;
+  animation: chat-live-pulse 1.2s ease-in-out infinite;
+}
+.grok-act__working-label {
+  min-width: 0;
+  font-size: var(--grok-act-font, 13px);
+  line-height: 1.4;
+}
+
+@keyframes chat-live-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+@keyframes chat-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.lobe-shiny-text {
+  color: var(--chat-text-2);
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  animation: none;
+}
+
+/* Bare tool expand body (failures) + phase step secondary expand */
+.lobe-timeline-tool {
+  flex-wrap: wrap;
+}
+.lobe-timeline-tool__body {
+  flex: 1 1 100%;
+  width: 100%;
+  margin: 0 0 2px 28px;
+  padding: 0 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Phase rail: expand sits under label inside .grok-act__main (no extra left margin). */
+.grok-act__expand-body {
+  margin: 2px 0 4px;
+  max-height: 160px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.lobe-timeline-tool__detail {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--chat-text-3);
+  /* Cap height so phase expand never blows VirtualList outer chrome. */
+  max-height: 140px;
+}
+.lobe-timeline-tool__fail-hint {
+  margin: 0;
+  padding: 0;
+  color: var(--chat-text-3);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Real tool output (ACP content[]) — terminal-transcript block, like zCode.
+   Boxed so a long stdout dump reads as a distinct surface rather than bleeding
+   into the activity rail, and scrolls internally instead of growing the turn. */
+.lobe-timeline-tool__output,
+.lobe-timeline-tool__cmd {
+  margin: 0;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid var(--chat-border, rgb(255 255 255 / 8%));
+  border-radius: 8px;
+  background: var(--chat-surface-2, rgb(255 255 255 / 3%));
+}
+.lobe-timeline-tool__pane {
+  position: relative;
+}
+.lobe-timeline-tool__copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  background: color-mix(in srgb, var(--chat-surface-2, rgb(0 0 0 / 45%)) 88%, transparent);
+}
+.lobe-timeline-tool__cmd {
+  padding: 6px 34px 6px 10px;
+  color: var(--chat-text-2);
+  white-space: pre-wrap;
+}
+.lobe-timeline-tool__cmd-sigil {
+  color: var(--chat-text-3);
+  user-select: none;
+}
+.lobe-timeline-tool__output {
+  padding: 8px 34px 8px 10px;
+  color: var(--chat-text-2);
+  max-height: 320px;
+}
+.lobe-timeline-tool__detail {
+  padding-right: 34px;
+}
+/* Command above output: join the two boxes (panes wrap each pre). */
+.lobe-timeline-tool__pane:has(.lobe-timeline-tool__cmd):not(:last-child) .lobe-timeline-tool__cmd {
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+}
+.lobe-timeline-tool__pane:has(.lobe-timeline-tool__cmd) + .lobe-timeline-tool__pane .lobe-timeline-tool__output {
+  border-radius: 0 0 8px 8px;
+}
+/* Inside a capped / virtual rail the outer list already scrolls — let the
+   output grow and keep a single scroller (nested bars trap the wheel).
+   Unscoped overflow:visible painted bash stdout over the conclusion. */
+.grok-act__steps--capped .grok-act__expand-body,
+.grok-act__steps--virtual .grok-act__expand-body {
+  max-height: none;
+  overflow: visible;
+}
+/* Nested step list inside an “探索” group: indent under the parent rail so the
+   child rows read as contents of the exploration burst, not peers of it. */
+.grok-act__explore-children {
+  margin: 2px 0 4px;
+  padding-left: 4px;
+  border-left: 1px solid var(--chat-border, rgb(255 255 255 / 6%));
+}
+/* User-facing mid-turn speech inside 工作了 — body text, not a 30px rail row. */
+.grok-act__step--speech {
+  display: block;
+  min-height: min-content;
+  padding: 4px 0 10px;
+  align-items: stretch;
+}
+.grok-act__speech {
+  color: var(--chat-text);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.grok-act__speech .chat-md,
+.grok-act__speech .md-body {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+.grok-act__speech p {
+  margin: 0 0 0.7em;
+}
+.grok-act__speech p:last-child {
+  margin-bottom: 0;
+}
+
+/* Full thought text revealed when a phase’s 💡 step is expanded — muted like
+   the standalone Thinking block, capped so a huge reasoning trace does not
+   bury the tool rows around it. */
+.grok-act__thought-body {
+  margin: 2px 0 4px;
+  padding: 4px 10px;
+  border-left: 2px solid var(--chat-border, rgb(255 255 255 / 8%));
+  max-height: 240px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--chat-text-3);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.lobe-timeline-tool-group {
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--chat-text-2);
+}
+.lobe-timeline-tool-group__list {
+  margin: 0;
+  padding: 0 0 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Bare thinking (Thought for Ns) — match activity chrome metrics ── */
+.grok-thought {
+  --grok-act-icon: 16px;
+  --grok-act-gap: 8px;
+  --grok-act-font: 13px;
+  width: 100%;
+  max-width: var(--chat-content-max, 48rem);
+  margin: 2px 0 4px;
+  font-size: var(--grok-act-font);
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--chat-text-2, #9ca3af) 95%, transparent);
+}
+.grok-thought__header {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--grok-act-gap);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--chat-text-2, #9ca3af) 92%, transparent);
+  font-size: var(--grok-act-font);
+  font-weight: 400;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+  cursor: pointer;
+  text-align: left;
+}
+.grok-thought__header:disabled {
+  cursor: default;
+}
+.grok-thought__header:not(:disabled):hover {
+  color: var(--chat-text-2, #d1d5db);
+}
+.grok-thought__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--grok-act-icon);
+  height: var(--grok-act-icon);
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 100%, transparent);
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.grok-thought.is-live .grok-thought__icon,
+.grok-thought__label--live {
+  animation: chat-live-pulse 1.2s ease-in-out infinite;
+}
+.grok-thought__label {
+  min-width: 0;
+  font-weight: 400;
+  font-size: var(--grok-act-font);
+  line-height: 1.4;
+  font-family: inherit;
+}
+.grok-thought__hint {
+  margin: 2px 0 0 24px; /* 16 icon + 8 gap */
+  max-width: 36rem;
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 92%, transparent);
+  font-size: 12px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.grok-thought__caret {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+/* Dig-in body: clearly secondary, not the answer */
+.grok-thought__body {
+  margin: 4px 0 2px 24px; /* 16 icon + 8 gap */
+  padding: 0 0 2px;
+  max-height: min(32vh, 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 95%, transparent);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+/* Live thinking is the current turn — do not nest a 220px scroller that
+ * clips the stream and fights the transcript stick-to-bottom. */
+.grok-thought.is-live .grok-thought__body {
+  max-height: none;
+  overflow: visible;
+}
+.grok-thought__body .chat-md,
+.grok-thought__body .chat-md--muted,
+.grok-thought__body .chat-md p,
+.grok-thought__body .chat-md li {
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 98%, transparent) !important;
+  font-size: 12.5px;
+}
+.grok-thought.is-collapsed .grok-thought__body {
+  display: none;
+}
+
+/* ── Historical turn fragments (folded progress notes) ── */
+.grok-fragments {
+  width: 100%;
+  max-width: var(--chat-content-max, 48rem);
+  margin: 2px 0 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--chat-text-2, #9ca3af) 92%, transparent);
+}
+.grok-fragments__header {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 100%, transparent);
+  font-size: 12.5px;
+  font-weight: 400;
+  font-family: inherit;
+  line-height: 1.5;
+  cursor: pointer;
+  text-align: left;
+}
+.grok-fragments__header:hover {
+  color: var(--chat-text-2, #d1d5db);
+}
+.grok-fragments__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 100%, transparent);
+  flex-shrink: 0;
+}
+.grok-fragments__label {
+  min-width: 0;
+  font-weight: 400;
+  font-family: inherit;
+}
+.grok-fragments__caret {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.75;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+/* Secondary dig-in body (muted, scrollable) */
+.grok-fragments__body {
+  margin: 6px 0 4px 26px;
+  padding: 0 0 4px;
+  max-height: min(32vh, 220px);
+  overflow-y: auto;
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 95%, transparent);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.grok-fragments__body .chat-md,
+.grok-fragments__body .chat-md--muted,
+.grok-fragments__body .chat-md p,
+.grok-fragments__body .chat-md li {
+  color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 98%, transparent) !important;
+  font-size: 12.5px;
+}
+.grok-fragments.is-collapsed .grok-fragments__body {
+  display: none;
+}
+
+/* Conclusion sits below the 工作了 fold (or a thought row), with one beat. */
+.chat-md--answer {
+  margin-top: 10px;
+  flex-shrink: 0;
+  min-height: min-content;
+  position: relative;
+}
+.lobe-chat-assistant-timeline > .grok-act + .chat-md--answer,
+.lobe-chat-assistant-timeline > .lobe-timeline-rail + .chat-md--answer {
+  margin-top: 10px;
+}
+
+/* ── Turn activity summary (tasks panel / legacy) ── */
+.lobe-turn-activity {
+  width: 100%;
+  max-width: var(--chat-content-max, 48rem);
+  margin: 6px 0 2px;
+  padding: 4px 0;
+  font-size: var(--chat-fs-sm);
+  color: var(--chat-text-2);
+  border-top: 1px solid color-mix(in srgb, var(--chat-border, #888) 28%, transparent);
+}
+/* Error state: no loud chrome — only red step dots / title count */

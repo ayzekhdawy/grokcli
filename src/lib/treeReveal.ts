@@ -1,0 +1,145 @@
+/**
+ * Sidebar project / Other-sessions expand. WKWebView drops transitions
+ * unless both ends are concrete px on the inline style (same lesson as
+ * paneSplitMotion — `grid-template-rows: 0fr/1fr` snaps like
+ * `width: 0 !important`).
+ */
+
+/** Matches `--motion-normal`. */
+export const TREE_REVEAL_MS = 200;
+export const TREE_REVEAL_CLOSE_MS = 200;
+export const TREE_REVEAL_PRESENCE_MS = TREE_REVEAL_CLOSE_MS + 48;
+
+export type TreeRevealSize = number | "auto";
+
+export type TreeRevealSizeStyle = {
+  height: number;
+  minHeight: number;
+  maxHeight: number;
+};
+
+export function treeRevealSizeStyle(heightPx: number): TreeRevealSizeStyle {
+  const n = Math.max(0, heightPx);
+  return { height: n, minHeight: n, maxHeight: n };
+}
+
+export function applyTreeRevealSize(
+  el: HTMLElement,
+  size: TreeRevealSize,
+): void {
+  if (size === "auto") {
+    el.style.height = "";
+    el.style.minHeight = "";
+    el.style.maxHeight = "";
+    return;
+  }
+  const v = `${Math.max(0, Math.round(size))}px`;
+  el.style.height = v;
+  el.style.minHeight = v;
+  el.style.maxHeight = v;
+}
+
+/** First paint of an already-open section must not animate from 0. */
+export function shouldAnimateTreeReveal(opts: {
+  isFirstCommit: boolean;
+  reducedMotion: boolean;
+}): boolean {
+  if (opts.isFirstCommit || opts.reducedMotion) return false;
+  return true;
+}
+
+/**
+ * Close must paint a locked px height, then 0. Writing auto→0 in one
+ * commit is the WKWebView snap (same as promoting 0→N before paint).
+ */
+export function treeRevealCloseSteps(contentPx: number): {
+  lockPx: number;
+  endPx: number;
+} {
+  return { lockPx: Math.max(0, Math.round(contentPx)), endPx: 0 };
+}
+
+export function measureTreeRevealContent(inner: HTMLElement | null): number {
+  if (!inner) return 0;
+  const direct = Math.round(inner.scrollHeight);
+  if (direct > 0) return direct;
+  let sum = 0;
+  for (let i = 0; i < inner.children.length; i++) {
+    sum += inner.children[i].getBoundingClientRect().height;
+  }
+  return Math.round(sum);
+}
+
+/**
+ * After a chat is moved into an already-open project, content can outgrow
+ * the last locked px height. Collapse-all (and moving chats out) can also
+ * leave the L1 projects wrapper locked taller than the remaining rows,
+ * which parks Default workspace under a slab of empty space.
+ * Retarget the lock to the new content px in either direction — do not
+ * settle to `auto` (that makes the next close snap). Ignore a 0px measure
+ * so a transient empty inner does not collapse an open section.
+ */
+export function shouldReleaseTreeRevealLock(opts: {
+  open: boolean;
+  animatingOpen: boolean;
+  contentPx: number;
+  boxPx: number;
+}): boolean {
+  if (!opts.open || opts.animatingOpen) return false;
+  if (opts.contentPx <= 0) return false;
+  return Math.abs(opts.contentPx - opts.boxPx) > 1;
+}
+
+let motionCount = 0;
+const idle = new Set<() => void>();
+const watchers = new Set<(active: boolean) => void>();
+
+export function isTreeRevealMotionActive(): boolean {
+  return motionCount > 0;
+}
+
+export function subscribeTreeRevealMotion(
+  fn: (active: boolean) => void,
+): () => void {
+  watchers.add(fn);
+  return () => {
+    watchers.delete(fn);
+  };
+}
+
+function emitMotion(active: boolean): void {
+  for (const fn of [...watchers]) fn(active);
+}
+
+export function beginTreeRevealMotion(): () => void {
+  const wasIdle = motionCount === 0;
+  motionCount += 1;
+  if (wasIdle) emitMotion(true);
+  let open = true;
+  return () => {
+    if (!open) return;
+    open = false;
+    motionCount = Math.max(0, motionCount - 1);
+    if (motionCount > 0) return;
+    // Restore overflow (subscribers) before deferred align / measure.
+    // Waiters call findScrollParent, which skips overflow:hidden.
+    emitMotion(false);
+    const waiters = [...idle];
+    idle.clear();
+    for (const fn of waiters) fn();
+  };
+}
+
+/** Queue `fn` until expand/collapse ends. Returns true when deferred. */
+export function runAfterTreeRevealMotion(fn: () => void): boolean {
+  if (motionCount === 0) return false;
+  idle.add(fn);
+  return true;
+}
+
+export function resetTreeRevealMotionForTests(): void {
+  motionCount = 0;
+  idle.clear();
+  if (watchers.size > 0) emitMotion(false);
+  watchers.clear();
+}

@@ -1,0 +1,177 @@
+import { describe, expect, it } from "vitest";
+import {
+  defaultPaletteActions,
+  filterPaletteActions,
+  type PaletteActionDef,
+} from "./paletteActions";
+
+const identityT = (key: string) => key;
+
+describe("defaultPaletteActions", () => {
+  it("includes stable ids for create, navigate, doctor, shortcuts, and settings", () => {
+    const ids = defaultPaletteActions().map((a) => a.id);
+    expect(ids).toEqual([
+      "new-chat",
+      "add-project",
+      "new-space",
+      "open-automations",
+      "open-ops",
+      "open-tasks",
+      "open-agent-dashboard",
+      "open-task-board",
+      "open-kanban",
+      "open-batch-agents",
+      "doctor",
+      "traces",
+      "reliability",
+      "shortcuts-help",
+      "product-tutorial",
+      "copy-conversation-md",
+      "resume-with-code-restore",
+      "continue-cwd",
+      "parallel-worktree-task",
+      "settings-general",
+      "settings-appearance",
+      "settings-account",
+      "settings-extensions",
+      "settings-runtime",
+      "settings-workflows",
+      "workflows-docs",
+      "settings-remote",
+      "settings-shortcuts",
+      "settings-about",
+    ]);
+  });
+
+  it("uses MessageKey labelKeys and non-empty keywords", () => {
+    for (const a of defaultPaletteActions()) {
+      expect(a.labelKey.length).toBeGreaterThan(0);
+      expect(a.keywords.length).toBeGreaterThan(0);
+      expect(a.id).toMatch(/^[a-z0-9-]+$/);
+    }
+  });
+
+  it("has unique ids", () => {
+    const ids = defaultPaletteActions().map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("filterPaletteActions", () => {
+  const catalog = defaultPaletteActions();
+
+  it("empty query returns all actions", () => {
+    const hits = filterPaletteActions("", catalog);
+    expect(hits).toHaveLength(catalog.length);
+    expect(hits.map((h) => h.id)).toEqual(catalog.map((a) => a.id));
+  });
+
+  it("whitespace-only query returns all actions", () => {
+    expect(filterPaletteActions("   ", catalog)).toHaveLength(catalog.length);
+  });
+
+  it("matches by id fragment", () => {
+    const hits = filterPaletteActions("settings-app", catalog);
+    expect(hits.map((h) => h.id)).toContain("settings-appearance");
+  });
+
+  it("matches by keyword", () => {
+    const doctor = filterPaletteActions("cli check", catalog);
+    expect(doctor.map((h) => h.id)).toEqual(["doctor"]);
+
+    const traces = filterPaletteActions("session trace", catalog);
+    expect(traces.map((h) => h.id)).toContain("traces");
+    const reliability = filterPaletteActions("observability", catalog);
+    expect(reliability.map((h) => h.id)).toEqual(["reliability"]);
+
+    // Shared keyword "diagnostics" hits doctor + reliability (diagnose group).
+    const diagnose = filterPaletteActions("diagnostics", catalog).map(
+      (h) => h.id,
+    );
+    expect(diagnose).toContain("doctor");
+    expect(diagnose).toContain("reliability");
+
+    const theme = filterPaletteActions("wallpaper", catalog);
+    expect(theme.map((h) => h.id)).toEqual(["settings-appearance"]);
+
+    const auto = filterPaletteActions("cron", catalog);
+    expect(auto.map((h) => h.id)).toEqual(["open-automations"]);
+
+    const kanban = filterPaletteActions("agent kanban", catalog);
+    expect(kanban.map((h) => h.id)).toContain("open-kanban");
+
+    // CLI -c/--continue for project path
+    const cont = filterPaletteActions("continue last agent", catalog);
+    expect(cont.map((h) => h.id)).toContain("continue-cwd");
+    expect(
+      filterPaletteActions("--continue", catalog).map((h) => h.id),
+    ).toContain("continue-cwd");
+
+    const parallel = filterPaletteActions("parallel task", catalog);
+    expect(parallel.map((h) => h.id)).toContain("parallel-worktree-task");
+    expect(
+      filterPaletteActions("git worktree", catalog).map((h) => h.id),
+    ).toContain("parallel-worktree-task");
+  });
+
+  it("matches translated label when t is provided", () => {
+    const t = (key: string) => {
+      if (key === "doctor.title") return "系统诊断";
+      if (key === "settings.nav.general") return "通用";
+      return key;
+    };
+    expect(filterPaletteActions("诊断", catalog, t).map((h) => h.id)).toEqual([
+      "doctor",
+    ]);
+    expect(filterPaletteActions("通用", catalog, t).map((h) => h.id)).toEqual([
+      "settings-general",
+    ]);
+  });
+
+  it("matches without t only via id/keywords/labelKey", () => {
+    const hits = filterPaletteActions("settings.nav.about", catalog);
+    expect(hits.map((h) => h.id)).toEqual(["settings-about"]);
+  });
+
+  it("is case-insensitive", () => {
+    expect(filterPaletteActions("DOCTOR", catalog).map((h) => h.id)).toEqual([
+      "doctor",
+    ]);
+    expect(filterPaletteActions("New Chat", catalog).map((h) => h.id)).toContain(
+      "new-chat",
+    );
+  });
+
+  it("respects limit", () => {
+    expect(filterPaletteActions("", catalog, undefined, { limit: 3 })).toHaveLength(
+      3,
+    );
+    const manySettings = filterPaletteActions("settings", catalog, identityT, {
+      limit: 2,
+    });
+    expect(manySettings).toHaveLength(2);
+  });
+
+  it("returns empty for nonsense query", () => {
+    expect(filterPaletteActions("zzzz-not-a-real-action", catalog)).toEqual([]);
+  });
+
+  it("works on a custom actions list", () => {
+    const custom: PaletteActionDef[] = [
+      {
+        id: "alpha",
+        labelKey: "search.newChat",
+        keywords: ["foo"],
+      },
+      {
+        id: "beta",
+        labelKey: "search.chats",
+        keywords: ["bar"],
+      },
+    ];
+    expect(filterPaletteActions("foo", custom).map((a) => a.id)).toEqual([
+      "alpha",
+    ]);
+    expect(filterPaletteActions("", custom)).toHaveLength(2);
+  });
+});

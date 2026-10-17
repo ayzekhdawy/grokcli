@@ -1,0 +1,145 @@
+/**
+ * Bottom terminal — sits under .main__stage inside the chat column.
+ * Closed height is inline 0 (same property as open) so persist-mounted
+ * PTY survives. Toggle snaps; do not interpolate height against the chat
+ * virtualizer. Do not use height: 0 !important — that fights the inline size.
+ */
+
+.bt {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-main);
+}
+
+.bt[data-open="false"] {
+  pointer-events: none;
+}
+
+.bt[data-open="true"]:not(.is-resizing)
+  :is(.bt__chrome, .bt__body) {
+  animation: bt-panel-in var(--motion-normal) var(--motion-pane-ease) both;
+}
+
+@keyframes bt-panel-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+  to {
+    opacity: 1;
+    translate: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bt[data-open="true"]:not(.is-resizing)
+    :is(.bt__chrome, .bt__body) {
+    animation: none;
+  }
+}
+
+.bt.is-resizing {
+  transition: none;
+}
+
+.bt__resize {
+  flex-shrink: 0;
+  height: 7px;
+  margin-top: -3px;
+  cursor: ns-resize;
+  touch-action: none;
+  position: relative;
+  z-index: 2;
+}
+
+.bt__resize::after {
+  content: "";
+  position: absolute;
+  inset: 3px 0 auto;
+  height: 1px;
+  background: var(--border-subtle);
+  transition: background var(--motion-fast) ease;
+  pointer-events: none;
+}
+
+.bt__resize:hover::after,
+.bt.is-resizing .bt__resize::after {
+  background: var(--border-focus);
+}
+
+.bt__chrome {
+  background: color-mix(in srgb, var(--bg-card) 72%, var(--bg-main));
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Close chip on every tab: hidden until hover. Active stays faintly on. */
+.bt .rp-tab .rp-tab__x {
+  opacity: 0;
+}
+
+.bt .rp-tab.is-active .rp-tab__x {
+  opacity: 0.55;
+}
+
+.bt .rp-tab:hover .rp-tab__x,
+.bt .rp-tab.is-active:hover .rp-tab__x,
+.bt .rp-tab .rp-tab__x:hover,
+.bt .rp-tab .rp-tab__x:focus-visible {
+  opacity: 1;
+}
+
+.bt__tabs {
+  flex: 1;
+  min-width: 0;
+}
+
+.bt__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-main);
+}
+
+html[data-wallpaper="1"] .bt {
+  background: color-mix(
+    in srgb,
+    var(--bg-main) var(--wallpaper-theme-mix-main),
+    transparent
+  );
+  backdrop-filter: blur(var(--wallpaper-settings-blur, 14px))
+    saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--wallpaper-settings-blur, 14px))
+    saturate(var(--glass-saturate));
+}
+
+html[data-wallpaper="1"] .bt__chrome {
+  background: color-mix(in srgb, var(--bg-card) 72%, transparent);
+}
+
+html[data-wallpaper="1"] .bt__body {
+  background: transparent;
+}
+
+.bt__persist-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+}
+
+.bt__persist-host[hidden] {
+  display: none !important;
+}
+
+/* Same veil-host stretch as the side persist pane */
+.bt__persist-host:has(.sw-terminal--pty) {
+  display: flex;
+  flex-direction: column;
+}

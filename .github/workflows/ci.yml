@@ -1,0 +1,203 @@
+# PR / push smoke: typecheck, unit tests, UI build, and Rust tests.
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # package.json packageManager is the single source (no hardcode version).
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Dependency hygiene (pnpm-only root)
+        # Reject root package-lock.json / missing pnpm-lock.yaml before install.
+        run: node scripts/check-deps-hygiene.mjs
+      - run: pnpm install --frozen-lockfile
+      - name: Production dependency audit
+        # Fail on moderate+ so known CVE bumps (e.g. DOMPurify / Mermaid) cannot silently regress.
+        run: pnpm run audit:prod
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: ESLint (minimal quality rules)
+        run: pnpm lint
+      - name: Code quality gates
+        run: python3 scripts/check-code-quality-gates.py --mode final
+      - name: Website download contract self-test
+        run: python3 scripts/publish-website-downloads.py --self-test
+      - run: pnpm build:ui
+
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS
+          - os: windows-latest
+            name: Windows
+          - os: ubuntu-latest
+            name: Linux
+    runs-on: ${{ matrix.os }}
+    name: Rust ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux WebKit deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Ayatana only — libappindicator3-dev conflicts with libayatana-appindicator3-dev on Ubuntu.
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          shared-key: ci-${{ matrix.name }}-v5
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        working-directory: src-tauri
+        # All three legs must stay at zero warnings: `-D warnings` blocks merge so
+        # platform-cfg dead code cannot silently re-accumulate (98 warnings piled
+        # up on macOS alone before the 2026-08 sweeps).
+        run: cargo clippy --all-targets -- -D warnings
+        continue-on-error: false
+      # Includes ACP golden fixtures (tests/fixtures/acp + acp_golden_test).
+      # Required green for any ACP / mock_acp / permission wire change (T06).
+      - name: cargo test
+        if: matrix.name != 'Windows'
+        working-directory: src-tauri
+        run: cargo test
+      # Windows MSVC lib tests link Tauri/WebView2/comctl32 and abort at process
+      # start with STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139) unless Common
+      # Controls v6 is activated. We cannot pass a second /MANIFESTINPUT through
+      # build.rs (CVT1100 vs tauri_build). Instead:
+      #   1) cargo test --no-run
+      #   2) mt.exe embeds windows-test-manifest.xml into each test harness
+      #   3) run harnesses directly (avoids cargo re-link wiping the resource)
+      # Also scrub PATH dirs that ship stale api-ms-win-*.dll (Temurin JDK).
+      - name: cargo test
+        if: matrix.name == 'Windows'
+        working-directory: src-tauri
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sep = [IO.Path]::PathSeparator
+
+          # --- scrub PATH (Temurin ships stale api-ms-win-*.dll forwarders) ---
+          $dropped = [System.Collections.Generic.List[string]]::new()
+          $windowsRoot = [IO.Path]::GetFullPath($env:SystemRoot).TrimEnd('\')
+          $kept = foreach ($d in ($env:Path -split $sep)) {
+            if (-not $d) { continue }
+            $shipsApiSet = $false
+            if (Test-Path -LiteralPath $d -PathType Container -ErrorAction SilentlyContinue) {
+              $fullPath = [IO.Path]::GetFullPath($d).TrimEnd('\')
+              $isWindowsDir = $fullPath.Equals($windowsRoot, [StringComparison]::OrdinalIgnoreCase) -or
+                $fullPath.StartsWith("$windowsRoot\", [StringComparison]::OrdinalIgnoreCase)
+              if (-not $isWindowsDir) {
+                $shipsApiSet = [bool](Get-ChildItem -LiteralPath $d -Filter 'api-ms-win-*.dll' -ErrorAction SilentlyContinue | Select-Object -First 1)
+              }
+            }
+            if ($shipsApiSet) {
+              [void]$dropped.Add($d)
+              continue
+            }
+            $d
+          }
+          if ($dropped.Count) {
+            Write-Host "Dropping PATH entries that ship api-ms-win-*.dll:"
+            foreach ($b in $dropped) { Write-Host "  - $b" }
+            $env:Path = ($kept -join $sep)
+          } else {
+            Write-Host "No PATH entry ships api-ms-win-*.dll"
+          }
+
+          # rust-cache restores target/ including Cargo fingerprints. Cleaning
+          # only this package forces the unit-test harness to be rebuilt from
+          # the checked-out source while preserving cached dependencies.
+          Write-Host "=== cargo clean -p grok-app ==="
+          cargo clean -p grok-app
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          Write-Host "=== cargo test --no-run ==="
+          cargo test --no-run
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          # Locate mt.exe (Windows SDK or MSVC host tools). Prefer Windows Kits —
+          # VS 2026 images sometimes omit mt next to dumpbin under VC\Tools\MSVC.
+          $mt = $null
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path -LiteralPath $vswhere) {
+            $candidates = @(
+              & $vswhere -latest -find "VC\Tools\MSVC\*\bin\Hostx64\x64\mt.exe" 2>$null
+              & $vswhere -latest -find "VC\Tools\MSVC\*\bin\HostX64\x64\mt.exe" 2>$null
+              & $vswhere -latest -find "**\mt.exe" 2>$null
+            ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+            if ($candidates.Count) { $mt = $candidates[0] }
+          }
+          if (-not $mt) {
+            $kitRoots = @(
+              (Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"),
+              (Join-Path $env:ProgramFiles "Windows Kits\10\bin")
+            )
+            foreach ($root in $kitRoots) {
+              if (-not (Test-Path -LiteralPath $root)) { continue }
+              $hit = Get-ChildItem -Path $root -Recurse -Filter "mt.exe" -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match '\\x64\\mt\.exe$' } |
+                Select-Object -First 1
+              if ($hit) { $mt = $hit.FullName; break }
+            }
+          }
+          if (-not $mt) {
+            $cmd = Get-Command mt.exe -ErrorAction SilentlyContinue
+            if ($cmd) { $mt = $cmd.Source }
+          }
+          if (-not $mt) { throw "mt.exe not found — cannot embed Common Controls v6 test manifest" }
+          Write-Host "mt.exe: $mt"
+
+          $manifest = Join-Path (Get-Location) "windows-test-manifest.xml"
+          if (-not (Test-Path -LiteralPath $manifest)) { throw "missing $manifest" }
+
+          $exes = @(Get-ChildItem -Path "target\debug\deps" -Filter "grok_app_lib-*.exe" -ErrorAction SilentlyContinue)
+          if (-not $exes.Count) {
+            # Fallback: any freshly built test harness under deps
+            $exes = @(Get-ChildItem -Path "target\debug\deps" -Filter "*-*.exe" -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -notmatch 'build_script|deps_dir' })
+          }
+          if (-not $exes.Count) { throw "no test harness exe found under target\debug\deps" }
+
+          foreach ($exe in $exes) {
+            Write-Host "Embedding Common Controls v6 manifest into $($exe.Name)"
+            # ;#1 = RT_MANIFEST. Overwrites any prior MANIFEST resource in the PE.
+            & $mt -nologo -manifest $manifest -outputresource:"$($exe.FullName);#1"
+            if ($LASTEXITCODE -ne 0) { throw "mt.exe failed for $($exe.Name) (exit $LASTEXITCODE)" }
+          }
+
+          Write-Host "=== run test harness(es) directly ==="
+          $failed = $false
+          foreach ($exe in $exes) {
+            Write-Host ">> $($exe.FullName)"
+            & $exe.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "harness failed: $($exe.Name) exit=$LASTEXITCODE"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }

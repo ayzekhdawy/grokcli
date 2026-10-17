@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: GrokGo (sister project)
+    url: https://github.com/RongleCat/grok-go
+    about: Local Grok / xAI gateway for Codex and OpenAI-compatible clients
+  - name: Author on X
+    url: https://x.com/cgnot996
+    about: 铁柱AGI@cgnot996

@@ -1,0 +1,670 @@
+/* ── Shell ── */
+.ext-panel.ext-ref-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.ext-panel.ext-ref-shell > .settings-page__lead {
+  margin: 0 0 14px;
+}
+
+.ext-panel__surface {
+  padding: 16px;
+  min-width: 0;
+}
+
+.ext-ref-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+/* ── Tabs + search (one row) ── */
+.ext-ref-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 0 0 18px;
+  padding: 0;
+}
+
+.ext-ref-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ext-ref-tabs__tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ext-ref-tabs__tab:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.ext-ref-tabs__tab.is-on {
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.ext-ref-tabs__count {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Trailing slot (search OR tab actions) — fixed height so tab switches don't jump */
+.ext-ref-tabs__trail {
+  flex: 0 1 auto;
+  min-width: 160px;
+  max-width: 320px;
+  margin-left: auto;
+  min-height: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.ext-ref-tabs__trail .settings-input,
+.ext-ref-tabs__trail input[type="search"] {
+  width: 100%;
+  min-width: 160px;
+  max-width: 280px;
+  font-size: 13px;
+  height: 32px;
+  border-radius: 999px;
+  box-sizing: border-box;
+}
+
+.ext-ref-tabs__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-height: 32px;
+}
+
+/* Unified control size inside Extensions shell */
+.ext-ref-shell .btn,
+.ext-ref-shell .btn.btn--sm,
+.ext-ref-shell .ext-bulk-btn {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.ext-ref-shell .ext-ref-icon-btn,
+.ext-ref-shell .ext-ref-gear {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  box-sizing: border-box;
+}
+
+/* Legacy alias — trail replaced search */
+.ext-ref-tabs__search {
+  flex: 0 1 220px;
+  min-width: 160px;
+  max-width: 280px;
+  margin-left: auto;
+  min-height: 32px;
+}
+
+.ext-ref-tabs__search .settings-input,
+.ext-ref-tabs__search input {
+  width: 100%;
+  font-size: 13px;
+  height: 32px;
+  border-radius: 999px;
+}
+
+/* ── Section block (flat — no nested settings-card) ── */
+.ext-ref-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ext-ref-block__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 2px;
+}
+
+.ext-ref-block__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+}
+
+.ext-ref-block__meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ext-ref-block__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Icon-only control — same 32px height as `.btn` */
+.ext-ref-icon-btn {
+  appearance: none;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md, 8px);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.ext-ref-icon-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--text-primary) 22%, transparent);
+}
+
+.ext-ref-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ext-ref-block__lead {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+/* ── Installed icon strip (Image #1 language) ── */
+.ext-ref-icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px 2px;
+  min-height: 44px;
+}
+
+.ext-ref-icon {
+  appearance: none;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  color: var(--text-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.ext-ref-icon:hover,
+.ext-ref-icon.is-on {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--text-primary) 22%, transparent);
+}
+
+.ext-ref-icon.is-off {
+  opacity: 0.55;
+}
+
+.ext-ref-icon__glyph {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  max-width: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Plugins page (reference: ChatGPT Featured 2-col) ── */
+.ext-ref-toolbar {
+  margin: 0 0 4px;
+}
+
+.ext-ref-plugins-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  /* Allow settings main pane to scroll long catalogs */
+  max-height: none;
+}
+
+/* Installed: horizontal icon strip */
+.ext-ref-installed-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 8px;
+  min-height: 48px;
+}
+
+.ext-ref-installed-chip {
+  appearance: none;
+  border: 0;
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.ext-ref-installed-chip:hover {
+  background: color-mix(in srgb, var(--text-primary) 11%, transparent);
+  transform: translateY(-1px);
+}
+
+.ext-ref-installed-chip.is-off {
+  opacity: 0.5;
+}
+
+.ext-ref-installed-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+/* Featured / Discover 2-column list */
+.ext-ref-featured {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 720px) {
+  .ext-ref-featured {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ext-ref-featured__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.ext-ref-featured__item:hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  cursor: pointer;
+}
+
+.ext-ref-featured__item.is-off {
+  opacity: 0.65;
+}
+
+/* Logo tile: no padding — image fills rounded box */
+.ext-ref-featured__icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  overflow: hidden;
+  color: var(--text-primary);
+  position: relative;
+}
+
+.ext-ref-featured__icon--logo {
+  padding: 0;
+  background: transparent;
+  display: block;
+}
+
+.ext-ref-featured__icon--logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+/* Letter fallback only when no logo */
+.ext-ref-featured__icon--fallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  padding: 0;
+}
+
+.ext-ref-featured__icon--fallback .ext-ref-icon__glyph {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.ext-ref-featured__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ext-ref-featured__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ext-ref-featured__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-ref-featured__desc {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-ref-featured__end {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 36px;
+  justify-content: flex-end;
+}
+
+.ext-ref-featured__more {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 0.05em;
+}
+
+.ext-ref-featured__more:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+}
+
+.ext-ref-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+}
+
+.ext-ref-section-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  padding: 0 2px;
+}
+
+.ext-ref-block__head .ext-ref-section-label {
+  margin: 0;
+}
+
+/* Discover category groups (meta interface.category) */
+.ext-ref-cat-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ext-ref-cat-group__label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ext-ref-cat-group__count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+/* Expand tile: stacked remaining-plugin icons + “N more” */
+.ext-ref-featured__more-tile {
+  cursor: pointer;
+}
+
+.ext-ref-featured__more-tile:hover {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.ext-ref-featured__more-icon {
+  /* Solid fallback when no remaining logos are available */
+  background: #fff;
+  color: var(--text-primary);
+}
+
+.ext-ref-stack-icons {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 40px;
+  min-width: 40px;
+  padding-left: 2px;
+}
+
+.ext-ref-stack-icons__item {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  overflow: hidden;
+  margin-left: -10px;
+  /* Pure white chip under each logo */
+  border: 2px solid var(--bg-elevated, var(--surface-1, var(--bg, #fff)));
+  background: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 22%, transparent);
+  position: relative;
+}
+
+.ext-ref-stack-icons__item:first-child {
+  margin-left: 0;
+}
+
+.ext-ref-stack-icons__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #fff;
+}
+
+/* legacy aliases used by recommended ChatCut card */
+.ext-ref-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ext-ref-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+}
+
+.ext-ref-card:hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.ext-ref-card.is-off {
+  opacity: 0.65;
+}
+
+.ext-ref-card__logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
+}
+
+.ext-ref-card__icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.ext-ref-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ext-ref-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-ref-card__desc {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-ref-card__end {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ext-ref-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+
+.ext-ref-group__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 0 2px 4px;
+  letter-spacing: 0.02em;
+}

@@ -1,0 +1,488 @@
+# Build & publish desktop installers:
+#   macOS ARM / Intel (.dmg)
+#   Windows x64 NSIS setup + portable zip (绿色版)
+#   Linux x64 AppImage / .deb / .rpm (Ubuntu/Debian + Fedora/RHEL family)
+# Trigger: push tag v*  (e.g. v0.1.1)  or manual workflow_dispatch.
+#
+# Prerequisites (repo Settings → Actions → General → Workflow permissions):
+#   - Read and write permissions (so the job can create/update Releases)
+#
+# Optional signing secrets (unsigned builds still work; macOS may warn):
+#   - Apple (all required together; omit entirely to ship unsigned):
+#            APPLE_CERTIFICATE              base64 of Developer ID Application .p12
+#            APPLE_CERTIFICATE_PASSWORD     .p12 export password
+#            APPLE_SIGNING_IDENTITY         e.g. Developer ID Application: Name (TEAMID)
+#            APPLE_TEAM_ID                  10-char Team ID
+#            APPLE_API_ISSUER               App Store Connect Issuer ID (UUID)
+#            APPLE_API_KEY                  App Store Connect Key ID
+#            APPLE_API_KEY_P8               AuthKey_<id>.p8 PEM contents (written to a
+#                                           temp path as APPLE_API_KEY_PATH for Tauri)
+#     Do NOT create empty APPLE_* secrets. Missing = skip sign/notarize.
+#     Prefer App Store Connect API key over APPLE_ID + app-specific password.
+#   - Windows Authenticode (optional OV/EV .pfx — removes Unknown publisher when set):
+#            WINDOWS_CERTIFICATE            base64-encoded .pfx
+#            WINDOWS_CERTIFICATE_PASSWORD   export password for the .pfx
+# Auto-update (optional — without these, installers still publish; in-app
+# update stays on the GitHub "open release page" path):
+#   - GROK_UPDATER_PUBLIC_KEY          minisign public key (embedded in app)
+#   - TAURI_SIGNING_PRIVATE_KEY        minisign private key (sign archives)
+#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD  (empty string OK)
+# See docs/desktop-auto-update.md and docs/BUILD.md (Windows Authenticode).
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to rebuild (e.g. v0.1.0). Leave empty to use package version draft."
+        required: false
+        default: ""
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            name: macOS-ARM64
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            name: macOS-x64
+          - platform: windows-latest
+            args: ""
+            name: Windows-x64
+          - platform: ubuntu-22.04
+            args: ""
+            name: Linux-x64
+
+    runs-on: ${{ matrix.platform }}
+    name: Build ${{ matrix.name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # Do not hardcode version — package.json packageManager (pnpm@9.15.9)
+        # is the single source. Dual version input fails with:
+        # "Multiple versions of pnpm specified".
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Linux system deps (WebKit / GTK / RPM)
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          # Use Ayatana only — libappindicator3-dev conflicts with libayatana-appindicator3-dev.
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            libssl-dev \
+            rpm \
+            file
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          shared-key: ${{ matrix.name }}
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Release description = CHANGELOG.md section for this version (bilingual body).
+      # Fails the job if `## [X.Y.Z]` is missing — write changelog before tagging.
+      - name: Prepare release notes from CHANGELOG
+        id: changelog
+        shell: bash
+        env:
+          # Windows runners default to cp1252; bilingual CHANGELOG needs UTF-8 stdout.
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VER="${{ github.ref_name }}"
+          else
+            VER="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          fi
+          python3 scripts/changelog-for-release.py "$VER" | tee release-notes.md
+          # Multiline body for tauri-action `releaseBody` (no releaseBodyFile input).
+          {
+            echo "RELEASE_BODY<<GROKAPP_EOF"
+            cat release-notes.md
+            echo "GROKAPP_EOF"
+          } >> "$GITHUB_ENV"
+
+      # Detect updater secrets without failing unsigned community builds.
+      # Half-config (only one of pubkey/privkey) is a maintainer error — hard-fail
+      # so we never ship "looks signed" installers without in-app update enabled.
+      - name: Detect updater secrets
+        id: updater
+        shell: bash
+        env:
+          GROK_UPDATER_PUBLIC_KEY: ${{ secrets.GROK_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          has_pub=0
+          has_priv=0
+          [[ -n "${GROK_UPDATER_PUBLIC_KEY:-}" ]] && has_pub=1
+          [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]] && has_priv=1
+          if [[ $has_pub -eq 1 && $has_priv -eq 1 ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Updater secrets present — enabling in-app auto-update artifacts"
+          elif [[ $has_pub -eq 0 && $has_priv -eq 0 ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Updater secrets missing — building without createUpdaterArtifacts (GitHub manual path)"
+          else
+            echo "::error::Partial updater secrets: GROK_UPDATER_PUBLIC_KEY=${has_pub} TAURI_SIGNING_PRIVATE_KEY=${has_priv}. Set both or neither."
+            exit 1
+          fi
+
+      - name: Write release config (updater)
+        if: steps.updater.outputs.enabled == 'true'
+        shell: bash
+        env:
+          GROK_UPDATER_PUBLIC_KEY: ${{ secrets.GROK_UPDATER_PUBLIC_KEY }}
+          GROK_UPDATER_ENDPOINT: https://github.com/${{ github.repository }}/releases/download/grok-desktop-latest/latest.json
+        run: node scripts/build-release-config.mjs
+
+      # Windows Authenticode (optional). Without secrets the build stays unsigned
+      # (SmartScreen "Unknown publisher" is expected). When present, import the
+      # .pfx and write a merge config with certificateThumbprint for tauri-bundler.
+      # Do NOT pass empty WINDOWS_* secrets — omit them entirely.
+      - name: Import Windows code signing certificate
+        id: win_sign
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:WINDOWS_CERTIFICATE)) {
+            Write-Host "WINDOWS_CERTIFICATE not set — Windows build will be unsigned"
+            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            return
+          }
+          if ([string]::IsNullOrEmpty($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            Write-Error "WINDOWS_CERTIFICATE set but WINDOWS_CERTIFICATE_PASSWORD is empty"
+            exit 1
+          }
+          New-Item -ItemType Directory -Force -Path certificate | Out-Null
+          $bytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [IO.File]::WriteAllBytes("$pwd/certificate/certificate.pfx", $bytes)
+          $secure = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          # PFX may include the full chain — pick the leaf with a private key
+          # (prefer Code Signing EKU) so thumbprint is a single 40-hex string.
+          $imported = @(Import-PfxCertificate -FilePath "$pwd/certificate/certificate.pfx" `
+            -CertStoreLocation Cert:\CurrentUser\My -Password $secure)
+          $withKey = @($imported | Where-Object { $_.HasPrivateKey })
+          $code = @($withKey | Where-Object {
+            -not $_.EnhancedKeyUsageList -or
+            ($_.EnhancedKeyUsageList | ForEach-Object { $_.FriendlyName }) -contains 'Code Signing'
+          }) | Select-Object -First 1
+          if (-not $code) { $code = $withKey | Select-Object -First 1 }
+          if (-not $code) {
+            Write-Error "No certificate with private key found in WINDOWS_CERTIFICATE PFX"
+            exit 1
+          }
+          $thumb = [string]$code.Thumbprint
+          if ($thumb -notmatch '^[0-9A-Fa-f]{40}$') {
+            Write-Error "Unexpected certificate thumbprint format: $thumb"
+            exit 1
+          }
+          Write-Host "Imported Windows code signing cert thumbprint=$thumb"
+          $cfg = @{
+            bundle = @{
+              windows = @{
+                certificateThumbprint = $thumb
+                digestAlgorithm = "sha256"
+                timestampUrl = "http://timestamp.digicert.com"
+              }
+            }
+          } | ConvertTo-Json -Depth 6
+          Set-Content -Path "src-tauri/tauri.windows.sign.conf.json" -Value $cfg -Encoding utf8
+          Remove-Item -Recurse -Force certificate -ErrorAction SilentlyContinue
+          "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      # Export Apple env only when APPLE_CERTIFICATE is non-empty.
+      # Empty APPLE_CERTIFICATE makes `tauri build` try codesign import and fail with:
+      #   "failed to import keychain certificate"
+      # TAURI_SIGNING_* are only set when updater is enabled (non-empty).
+      # WINDOWS_CERTIFICATE* are only used on windows-latest when present.
+      - name: Export Apple signing env
+        if: startsWith(matrix.platform, 'macos')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_CERTIFICATE:-}" ]]; then
+            echo "APPLE_CERTIFICATE not set — macOS build will be unsigned"
+            exit 0
+          fi
+          if [[ -z "${APPLE_CERTIFICATE_PASSWORD:-}" || -z "${APPLE_SIGNING_IDENTITY:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
+            echo "::error::APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD / APPLE_SIGNING_IDENTITY / APPLE_TEAM_ID is empty"
+            exit 1
+          fi
+          {
+            echo "APPLE_CERTIFICATE<<GROKAPP_EOF"
+            printf '%s\n' "$APPLE_CERTIFICATE"
+            echo "GROKAPP_EOF"
+            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+          } >> "$GITHUB_ENV"
+          if [[ -n "${APPLE_API_KEY_P8:-}" ]]; then
+            if [[ -z "${APPLE_API_ISSUER:-}" || -z "${APPLE_API_KEY:-}" ]]; then
+              echo "::error::APPLE_API_KEY_P8 is set but APPLE_API_ISSUER / APPLE_API_KEY is empty"
+              exit 1
+            fi
+            mkdir -p "$RUNNER_TEMP/apple-signing"
+            printf '%s\n' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/apple-signing/AuthKey.p8"
+            chmod 600 "$RUNNER_TEMP/apple-signing/AuthKey.p8"
+            {
+              echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/apple-signing/AuthKey.p8"
+              echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+              echo "APPLE_API_KEY=$APPLE_API_KEY"
+            } >> "$GITHUB_ENV"
+            echo "Apple signing + App Store Connect API key enabled"
+          else
+            echo "Apple certificate present but no APPLE_API_KEY_P8 — will sign without notarizing"
+          fi
+
+      - name: Build Tauri app & attach to GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GROK_UPDATER_PUBLIC_KEY: ${{ secrets.GROK_UPDATER_PUBLIC_KEY }}
+          GROK_UPDATER_ENDPOINT: https://github.com/${{ github.repository }}/releases/download/grok-desktop-latest/latest.json
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # Root package.json + src-tauri/ layout (create-tauri-app style)
+          projectPath: .
+          # Prefer the pushed git tag; fallback replaces __VERSION__ from tauri.conf.json
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: "Grok App v__VERSION__"
+          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseDraft: false
+          prerelease: false
+          # --config injects pubkey/endpoint + createUpdaterArtifacts and/or Windows thumbprint.
+          # GROK_UPDATER_* env (above) enables build.rs registration cfg.
+          args: >-
+            ${{ matrix.args }}
+            ${{ steps.updater.outputs.enabled == 'true' && ' --config src-tauri/tauri.release.conf.json' || '' }}
+            ${{ matrix.platform == 'windows-latest' && steps.win_sign.outputs.enabled == 'true' && ' --config src-tauri/tauri.windows.sign.conf.json' || '' }}
+          # We assemble a multi-platform latest.json in assemble-updater-manifest.
+          includeUpdaterJson: false
+
+      # macOS: tauri-action often uploads only the .dmg. Silent update needs the
+      # signed .app.tar.gz (+ .sig) with arch in the filename for assemble-updater.
+      - name: Upload macOS updater archives
+        if: startsWith(matrix.platform, 'macos') && steps.updater.outputs.enabled == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          fi
+          VER="${TAG#v}"
+          if [[ "${{ matrix.args }}" == *aarch64* ]]; then
+            ARCH=aarch64
+            TRIPLE=aarch64-apple-darwin
+          else
+            ARCH=x64
+            TRIPLE=x86_64-apple-darwin
+          fi
+          BUNDLE="src-tauri/target/${TRIPLE}/release/bundle/macos"
+          # Fallback if no --target dir (host arch build).
+          if [[ ! -d "$BUNDLE" ]]; then
+            BUNDLE="src-tauri/target/release/bundle/macos"
+          fi
+          SRC_TAR="$(find "$BUNDLE" -maxdepth 1 -name '*.app.tar.gz' ! -name '*.sig' | head -1 || true)"
+          if [[ -z "$SRC_TAR" || ! -f "$SRC_TAR" ]]; then
+            echo "::error::macOS updater archive missing under $BUNDLE (need bundle target 'app')"
+            ls -la "$BUNDLE" 2>/dev/null || true
+            exit 1
+          fi
+          SRC_SIG="${SRC_TAR}.sig"
+          if [[ ! -f "$SRC_SIG" ]]; then
+            echo "::error::missing signature for $SRC_TAR"
+            exit 1
+          fi
+          OUT_TAR="Grok_${VER}_${ARCH}.app.tar.gz"
+          OUT_SIG="${OUT_TAR}.sig"
+          cp "$SRC_TAR" "$OUT_TAR"
+          cp "$SRC_SIG" "$OUT_SIG"
+          echo "Uploading $OUT_TAR (+ .sig) to $TAG"
+          gh release upload "$TAG" "$OUT_TAR" "$OUT_SIG" --clobber
+
+      # 绿色版：免安装 zip（单文件 exe + 说明）。WebView2 仍由系统提供。
+      - name: Windows portable zip (绿色版)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          fi
+          bash scripts/package-windows-portable.sh "$TAG"
+
+  # Hard gate: every matrix leg must succeed AND the Release must list every
+  # required installer. Without this, fail-fast:false lets mac/linux publish a
+  # Latest that is missing Windows (v0.2.32) while the overall workflow is red
+  # but easy to miss. Agents / maintainers must wait for this job.
+  gate-release-assets:
+    name: Gate — all platform installers present
+    needs: publish
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require every platform build + installer asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          fi
+          if [[ "$PUBLISH_RESULT" != "success" ]]; then
+            echo "::error::Platform matrix result=$PUBLISH_RESULT (need success). One of macOS-ARM64 / macOS-x64 / Windows-x64 / Linux-x64 failed — do not treat this Release as complete."
+            # Still list what landed so the missing platform is obvious.
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[].name' 2>/dev/null | sort || true
+            exit 1
+          fi
+          bash scripts/assert-release-assets.sh "$TAG" --repo "$GITHUB_REPOSITORY"
+
+  # After all platform builds: merge .sig + archives into rolling latest.json.
+  # Skips cleanly when updater secrets were never used (no .sig on the release).
+  assemble-updater:
+    needs: [publish, gate-release-assets]
+    runs-on: ubuntu-22.04
+    name: Assemble updater latest.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assemble rolling grok-desktop-latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GROK_UPDATER_PUBLIC_KEY: ${{ secrets.GROK_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GROK_UPDATER_PUBLIC_KEY:-}" || -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
+            echo "Updater secrets not configured — skip assemble-updater-manifest"
+            exit 0
+          fi
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          fi
+          # Hard-fail when secrets are present but rolling manifest cannot be built —
+          # otherwise clients stay stuck on the GitHub manual-download path.
+          TAG="$TAG" REPO="$GITHUB_REPOSITORY" bash scripts/assemble-updater-manifest.sh
+
+  # Supply-chain floor (NEW-06): one SHA256SUMS over every published asset so
+  # users can verify downloads. Runs after all platform builds have uploaded.
+  checksums:
+    needs: [publish, gate-release-assets, assemble-updater]
+    runs-on: ubuntu-22.04
+    name: Publish SHA256SUMS + website downloads
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute and upload SHA256SUMS + website download contract
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          fi
+          mkdir -p /tmp/release-assets
+          cd /tmp/release-assets
+          # Download everything except a stale checksum file from a rebuild.
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*' || true
+          rm -f SHA256SUMS
+          # Re-assert before aliases — Windows setup/portable must be on disk.
+          bash "${GITHUB_WORKSPACE}/scripts/assert-release-assets.sh" "$TAG" --repo "$GITHUB_REPOSITORY"
+          # Stable aliases (Grok_mac_x64.dmg, Grok_windows_x64-setup.exe, …)
+          # + downloads.json for grok-app.com. Files stay on GitHub Releases.
+          python3 "${GITHUB_WORKSPACE}/scripts/publish-website-downloads.py" \
+            --dir /tmp/release-assets \
+            --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --write-aliases
+          shopt -s nullglob
+          files=(*)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "error: no release assets found for $TAG" >&2
+            exit 1
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS
+          cat SHA256SUMS
+          extra=()
+          if [[ -f .website-upload.txt ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+              [[ -z "${line:-}" ]] && continue
+              extra+=("$line")
+            done < .website-upload.txt
+          fi
+          gh release upload "$TAG" SHA256SUMS "${extra[@]}" --repo "$GITHUB_REPOSITORY" --clobber

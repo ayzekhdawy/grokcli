@@ -1,0 +1,668 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+.ext-market-detail__desc {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.ext-market-detail__desc--muted {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.ext-market-detail__meta {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ext-market-detail__row {
+  display: grid;
+  grid-template-columns: minmax(88px, 30%) 1fr;
+  gap: 8px 12px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.ext-market-detail__row dt {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--text-tertiary);
+}
+
+.ext-market-detail__row dd {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  word-break: break-word;
+  min-width: 0;
+}
+
+.ext-market-detail__code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.ext-market-detail__trust {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.ext-empty {
+  margin: 0;
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-tertiary);
+}
+
+.ext-empty-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 16px 24px;
+  text-align: center;
+}
+
+.ext-empty-cta__text {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-tertiary);
+}
+
+.ext-empty-cta .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ext-field-hint {
+  margin: 0;
+  padding: 6px 14px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.ext-count {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+}
+
+.ext-footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.ext-footnote svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.8;
+}
+
+
+/* ── Remote mirror: Connect panel (desktop) ─────────────────────────────── */
+.mirror-connect__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mirror-connect {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Inline phone-mirror body inside a normal .settings-card */
+.mirror-connect--inline {
+  padding: 14px 16px 16px;
+  max-width: none;
+}
+
+.mirror-connect__hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* ── Project inspect (Settings → Runtime) ───────────────────────────────── */
+/* Prefer flat body padding over nested .settings-card frames. */
+.pi-settings-body {
+  padding: 4px 16px 16px;
+  border: none;
+  background: transparent;
+}
+
+.pi-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.pi-toolbar {
+  margin-top: 10px;
+}
+
+.pi-empty {
+  margin: 12px 0 0;
+  padding: 14px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-subtle);
+  background: var(--bg-hover);
+}
+
+.pi-empty__title {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pi-empty__body {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.mirror-connect__phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.mirror-connect__phase-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.mirror-connect__phase--ok .mirror-connect__phase-dot {
+  background: #3ecf8e;
+}
+
+.mirror-connect__phase--warn {
+  color: var(--text-primary);
+}
+
+.mirror-connect__phase--warn .mirror-connect__phase-dot {
+  background: #e6a23c;
+}
+
+.mirror-connect__phase--err {
+  color: var(--danger, #e55);
+}
+
+.mirror-connect__phase--err .mirror-connect__phase-dot {
+  background: var(--danger, #e55);
+}
+
+.mirror-connect__clients {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.mirror-connect__err-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: rgba(230, 162, 60, 0.14);
+  color: var(--text-secondary);
+  border: 1px solid rgba(230, 162, 60, 0.35);
+}
+
+.mirror-connect__err-chip--err {
+  background: rgba(220, 60, 60, 0.12);
+  border-color: rgba(220, 60, 60, 0.3);
+  color: var(--danger, #e55);
+}
+
+.mirror-connect__err-chip--warn {
+  background: rgba(230, 162, 60, 0.14);
+  border-color: rgba(230, 162, 60, 0.35);
+}
+
+.mirror-connect__soft-banner {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(230, 162, 60, 0.1);
+  border: 1px solid rgba(230, 162, 60, 0.28);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.mirror-connect__error {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(220, 60, 60, 0.1);
+  border: 1px solid rgba(220, 60, 60, 0.25);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.mirror-connect__error--soft {
+  background: rgba(230, 162, 60, 0.08);
+  border-color: rgba(230, 162, 60, 0.28);
+}
+
+.mirror-connect__error-msg {
+  font-weight: 500;
+}
+
+.mirror-connect__error-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.mirror-connect__qr-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.mirror-connect__qr {
+  display: block;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.mirror-connect__qr-placeholder {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 20px;
+}
+
+.mirror-connect__link-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mirror-connect__link-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.mirror-connect__link-box {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mirror-connect__url {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-all;
+  color: var(--text-secondary);
+}
+
+.mirror-connect__copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+}
+
+.mirror-connect__warn {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+/* Persistent warning while phone write (send / tool approve) is enabled */
+.mirror-connect__write-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(220, 140, 40, 0.12);
+  border: 1px solid rgba(220, 140, 40, 0.35);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.mirror-connect__write-banner-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: rgba(220, 140, 40, 0.28);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mirror-connect__write-banner-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.mirror-connect__write-toggle--on {
+  color: var(--danger, #e55);
+}
+
+/* Max concurrent phone clients (1–16) */
+.mirror-connect__max-clients {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+
+.mirror-connect__max-clients-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mirror-connect__max-clients-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mirror-connect__max-clients-input {
+  width: 4.5rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated, var(--bg-secondary));
+  color: var(--text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mirror-connect__max-clients-input:focus {
+  outline: none;
+  border-color: var(--accent, #6b8cff);
+}
+
+.mirror-connect__max-clients-value {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mirror-connect__max-clients-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+/* Write-on: allowlisted RPC categories + broad warning */
+.mirror-connect__write-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 4px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(220, 140, 40, 0.28);
+  background: rgba(220, 140, 40, 0.06);
+}
+
+.mirror-connect__write-surface-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+
+.mirror-connect__write-surface-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mirror-connect__write-surface-broad {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgb(180, 100, 20);
+  line-height: 1.3;
+}
+
+.mirror-connect__write-surface-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.mirror-connect__write-cats {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mirror-connect__write-cat {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.mirror-connect__footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.mirror-connect--inline .mirror-connect__footer {
+  padding-top: 4px;
+}
+
+/* Local write-ACL audit log (ring buffer; never stores tokens/URLs) */
+.mirror-connect__audit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mirror-connect__audit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mirror-connect__audit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mirror-connect__audit-toggle:hover {
+  color: var(--text-primary);
+}
+
+.mirror-connect__audit-chevron {
+  flex-shrink: 0;
+  width: 1em;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.mirror-connect__audit-title {
+  min-width: 0;
+}
+
+.mirror-connect__audit-count {
+  flex-shrink: 0;
+  min-width: 1.25em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.mirror-connect__audit-clear {
+  flex-shrink: 0;
+}
+
+.mirror-connect__audit-empty {
+  margin: 0;
+  padding: 8px 0 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.mirror-connect__audit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.mirror-connect__audit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mirror-connect__audit-row:last-child {
+  border-bottom: none;
+}
+
+.mirror-connect__audit-when {
+  flex-shrink: 0;
+  min-width: 7.5em;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+}
+
+.mirror-connect__audit-label {
+  min-width: 0;
+  color: var(--text-secondary);
+}
+
+/* ── Phone mirror layout (DESIGN §4.3 / TASK-mobile-redesign) ───────────── */
+.app-shell--mirror {
+  /* iOS / Android safe areas */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Hide desktop window chrome for mirror clients (meaningless in a browser) */
+.app-shell--mirror .window-controls {
+  display: none !important;
+}
+
+/* Always-on mirror tweaks (any width) — still safe on desktop mirror preview */
+.app-shell--mirror .perm-bar__actions {
+  gap: 8px;
+}
+
+.app-shell--mirror .perm-bar__btn {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+/*
+ * Phone chrome: ONLY under max-width 820px AND .app-shell--phone
+ * (mirror + JS phoneLayout). At ≥821px none of these rules match → desktop
+ * layout is byte-identical to pre-redesign.
+ */

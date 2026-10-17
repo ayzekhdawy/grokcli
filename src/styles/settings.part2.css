@@ -1,0 +1,995 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+
+.ui-check:focus-visible {
+  outline: none;
+}
+
+.ui-check:focus-visible .ui-check__box {
+  box-shadow:
+    0 0 0 2px var(--bg-elevated, #1c1c1e),
+    0 0 0 4px color-mix(in srgb, var(--accent, #6b9fff) 55%, transparent);
+}
+
+.ui-check__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-strong, rgba(255, 255, 255, 0.18));
+  background: color-mix(in srgb, var(--bg-elevated, #2a2a2c) 70%, transparent);
+  color: transparent;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 100ms ease,
+    box-shadow 120ms ease;
+}
+
+.ui-check:hover .ui-check__box {
+  border-color: color-mix(in srgb, var(--accent, #6b9fff) 45%, var(--border-strong, #666));
+}
+
+.ui-check.is-on .ui-check__box,
+.ui-check.is-mixed .ui-check__box {
+  background: var(--accent, #6b9fff);
+  border-color: var(--accent, #6b9fff);
+  color: #fff;
+}
+
+.ui-check.is-on:hover .ui-check__box,
+.ui-check.is-mixed:hover .ui-check__box {
+  filter: brightness(1.06);
+}
+
+.ui-check__label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ui-check--all .ui-check__label {
+  font-size: 13px;
+}
+
+.ui-check--group {
+  margin-right: 2px;
+}
+
+/* Agent-home config.toml allowlisted section editor */
+.settings-config-edit {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border, #333) 70%, transparent);
+}
+
+.settings-config-edit__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.settings-config-edit__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.settings-config-edit__preview {
+  margin-top: 12px;
+}
+
+.settings-config-edit__pre {
+  margin: 6px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  background: color-mix(in srgb, var(--bg-elevated, #1a1a1a) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border, #333) 80%, transparent);
+  color: var(--text-secondary, #b0b0b0);
+}
+
+html[data-theme="light"] .settings-config-edit__pre {
+  background: color-mix(in srgb, #f4f4f5 96%, transparent);
+  color: #3f3f46;
+}
+
+/* Marquee surface for rubber-band multi-select */
+.settings-archived-surface {
+  position: relative;
+  min-height: 80px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.settings-archived-surface.is-marqueeing {
+  cursor: crosshair;
+}
+
+.settings-archived-marquee {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--accent, #6b9fff) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #6b9fff) 14%, transparent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #6b9fff) 18%, transparent);
+}
+
+.settings-archived-group {
+  margin-bottom: 4px;
+}
+
+.settings-archived-group__count {
+  margin-left: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+}
+
+.settings-archived-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: default;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 46px;
+}
+
+.settings-archived-row:hover {
+  background: var(--bg-hover);
+}
+
+.settings-archived-row.is-selected {
+  background: color-mix(in srgb, var(--accent, #6b9fff) 12%, transparent);
+}
+
+.settings-archived-row.is-selected:hover {
+  background: color-mix(in srgb, var(--accent, #6b9fff) 16%, transparent);
+}
+
+.settings-archived-row__text {
+  min-width: 0;
+  flex: 1;
+  pointer-events: none;
+}
+
+.settings-archived-row__title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-archived-row__meta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings-archived-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.settings-archived-row__actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+html[data-theme="light"] .ui-check__box {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="light"] .ui-check.is-on .ui-check__box,
+html[data-theme="light"] .ui-check.is-mixed .ui-check__box {
+  background: var(--accent, #3b7cff);
+  border-color: var(--accent, #3b7cff);
+  color: #fff;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-card .settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.settings-row__controls--grow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.settings-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-color-picker__swatch {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+}
+
+.settings-color-picker__swatch input[type="color"] {
+  position: absolute;
+  inset: -4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.settings-color-picker__hex {
+  width: 7.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-row__controls--grow .settings-input,
+.settings-row__controls--grow .font-select {
+  flex: 1 1 12rem;
+  min-width: 8rem;
+}
+
+.font-select .c-select__trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.font-select__panel.c-select__menu {
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  padding-top: 8px;
+}
+
+.font-select__search {
+  width: 100%;
+  margin: 0 0 6px;
+  flex: none;
+}
+
+.font-select__list {
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--menu-gap);
+  min-height: 0;
+}
+
+.font-select__status {
+  padding: 8px 10px;
+  font-size: var(--text-sm);
+}
+
+.settings-input--narrow {
+  width: 4.5rem;
+  flex: 0 0 auto;
+}
+
+.settings-inline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm, 13px);
+  color: var(--text-muted, inherit);
+}
+
+/* Two-column compact grid for the custom STT engine fields. Cells mirror the
+   page's settings-row rhythm (label left, control right) so the block reads
+   as part of the row instead of a detached form. */
+.settings-stt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  margin-top: 10px;
+  width: 100%;
+  max-width: 46rem;
+}
+.settings-stt-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.settings-stt-field > .settings-row__label {
+  color: var(--text-muted, inherit);
+  font-size: var(--text-sm, 13px);
+  white-space: nowrap;
+}
+.settings-stt-field--wide {
+  grid-column: 1 / -1;
+}
+/* Controls fill their cell so both columns line up. */
+.settings-stt-field .settings-select,
+.settings-stt-field .c-select,
+.settings-stt-field .settings-input {
+  width: 100%;
+  min-width: 0;
+}
+.settings-stt-field .prov-key-row .settings-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-font-preview {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-elevated, rgba(127, 127, 127, 0.12));
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+/*
+ * Follow-up copy under a control inside a stacked row (Select / input).
+ * Prefer these over ad-hoc style={{ marginTop }} — bare margin on
+ * .settings-row__desc (designed for under-label) looked stuck to the control.
+ */
+.settings-row--stack > .settings-row__desc {
+  margin-top: 8px;
+}
+
+.settings-row--stack > .settings-row__hint {
+  margin-top: 6px;
+}
+
+/* Stacked status lines under a control (soft-fail → activity → path). */
+.settings-row--stack > .settings-row__hint + .settings-row__hint,
+.settings-row--stack > .settings-row__desc + .settings-row__hint {
+  margin-top: 4px;
+}
+
+/*
+ * Button row under stacked fields. Was used widely with only inline styles.
+ */
+.settings-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-row__actions:first-child {
+  margin-top: 0;
+}
+
+.settings-row__desc.is-danger {
+  color: var(--danger, #e35);
+}
+
+/* Standalone desc (dialogs / empty copy) — no under-label spacing. */
+.settings-row__desc.is-flush {
+  margin: 0;
+}
+
+/* Section blocks that sit outside a settings-card (CLI worktree DB, etc.). */
+.settings-block-gap {
+  margin-top: 12px;
+}
+
+/* Settings → Keyboard (remappable shortcut catalog) */
+.settings-shortcuts-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-shortcuts-reset-count {
+  margin-left: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-shortcuts-scope-pref {
+  margin: 0 0 4px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.settings-shortcuts-scope {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.settings-shortcuts-scope--global {
+  background: color-mix(in srgb, var(--accent, #6b8afd) 10%, transparent);
+}
+
+.settings-shortcuts-scope--chat {
+  background: color-mix(in srgb, var(--text-tertiary) 12%, transparent);
+}
+
+.settings-shortcuts-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  margin: 0 16px 8px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+
+.settings-shortcuts-filter input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.settings-shortcuts-filter input[type="search"]::-webkit-search-decoration,
+.settings-shortcuts-filter input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.settings-shortcuts-empty {
+  margin: 0;
+  padding: 20px 16px 24px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.settings-shortcuts-recording-hint,
+.settings-shortcuts-error {
+  margin: 0 16px 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.settings-shortcuts-recording-hint {
+  background: color-mix(in srgb, var(--accent, #6b8afd) 12%, transparent);
+  color: var(--text-secondary);
+}
+
+.settings-shortcuts-error {
+  background: color-mix(in srgb, var(--danger, #e55) 14%, transparent);
+  color: var(--text-primary);
+}
+
+/* Chord conflict visualization (Settings → Keyboard) */
+.settings-shortcuts-conflicts {
+  margin: 0 16px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger, #e55) 35%, var(--border-subtle));
+  background: color-mix(in srgb, var(--danger, #e55) 10%, transparent);
+}
+
+.settings-shortcuts-conflicts__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.settings-shortcuts-conflicts__badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+  color: color-mix(in srgb, var(--danger, #e55) 90%, var(--text-primary));
+  background: color-mix(in srgb, var(--danger, #e55) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger, #e55) 28%, transparent);
+}
+
+.settings-shortcuts-conflicts__meta {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.settings-shortcuts-conflicts__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-shortcuts-conflicts__desc {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.settings-shortcuts-conflicts__list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-shortcuts-conflicts__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.settings-shortcuts-conflicts__actions {
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.settings-shortcuts-row--conflict td {
+  background: color-mix(in srgb, var(--danger, #e55) 7%, transparent);
+}
+
+.settings-shortcuts-kbd.is-conflict {
+  border-color: color-mix(in srgb, var(--danger, #e55) 45%, var(--border-subtle));
+  color: var(--text-primary);
+}
+
+.settings-shortcuts-group {
+  padding: 8px 16px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-shortcuts-group:last-of-type {
+  border-bottom: none;
+}
+
+.settings-shortcuts-group__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 8px 0 10px;
+}
+
+.settings-shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.settings-shortcuts-table th,
+.settings-shortcuts-table td {
+  text-align: left;
+  padding: 8px 10px 8px 0;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.settings-shortcuts-table th {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.settings-shortcuts-table th.is-platform-active {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.settings-shortcuts-table tr:last-child td {
+  border-bottom: none;
+}
+
+.settings-shortcuts-col-actions {
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 0;
+}
+
+.settings-shortcuts-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.settings-shortcuts-row--recording td {
+  background: color-mix(in srgb, var(--accent, #6b8afd) 8%, transparent);
+}
+
+.settings-shortcuts-custom-dot {
+  margin-left: 4px;
+  color: var(--accent, #6b8afd);
+  font-weight: 700;
+}
+
+.settings-shortcuts-kbd {
+  display: inline-block;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated, var(--bg-input));
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.settings-shortcuts-kbd.is-recording {
+  border-color: var(--accent, #6b8afd);
+  color: var(--text-primary);
+  animation: settings-shortcuts-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes settings-shortcuts-pulse {
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.settings-shortcuts-fixed {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings-shortcuts-note {
+  margin: 0;
+  padding: 12px 16px 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+/*
+ * Full-width explanatory note inside a .settings-card, between rows.
+ * Must carry its own padding + bottom border — a bare <p> had no styles and
+ * visually fused with the next settings-row (session mode help + keychain).
+ */
+.settings-card__note,
+.settings-page__hint {
+  margin: 0;
+  padding: 0 16px 14px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Read as a continuation of the preceding row (session data mode). */
+.settings-row + .settings-card__note,
+.settings-row + .settings-page__hint {
+  margin-top: -2px;
+  padding-top: 0;
+}
+
+.settings-card > .settings-card__note:last-child,
+.settings-card > .settings-page__hint:last-child {
+  border-bottom: none;
+  padding-bottom: 14px;
+}
+
+.settings-row__text {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-row__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.settings-row__label-text {
+  min-width: 0;
+}
+
+/* “?” after module name — explanation lives in Tip, not a desc block */
+.settings-label-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: help;
+  line-height: 0;
+  opacity: 0.75;
+  transition:
+    color var(--motion-fast) ease,
+    opacity var(--motion-fast) ease,
+    background var(--motion-fast) ease;
+}
+
+.settings-label-help:hover,
+.settings-label-help:focus-visible {
+  opacity: 1;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+  outline: none;
+}
+
+.settings-row__desc {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.settings-row__hint.is-danger {
+  color: var(--danger, #d33);
+}
+
+/* Full-width custom Select inside stacked settings rows */
+.settings-row--stack > .settings-select,
+.settings-row--stack > .c-select.settings-select {
+  width: 100%;
+  max-width: 420px;
+}
+
+.settings-row--stack > .settings-select .c-select__trigger,
+.settings-select .c-select__trigger {
+  width: 100%;
+}
+
+/* Settings → Runtime → Network: connectivity probe results */
+.settings-netprobe {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.settings-netprobe__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-netprobe__chip.is-warn .settings-acp-chip__dot,
+.settings-acp-chip.is-warn .settings-acp-chip__dot {
+  background: var(--warning, #c9902c);
+}
+
+.settings-netprobe__chip.is-warn .settings-acp-chip__label,
+.settings-acp-chip.is-warn .settings-acp-chip__label {
+  color: var(--warning, #c9902c);
+}
+
+.settings-netprobe__chip.is-muted .settings-acp-chip__dot,
+.settings-acp-chip.is-muted .settings-acp-chip__dot {
+  background: var(--text-tertiary);
+}
+
+.settings-netprobe__chip.is-muted .settings-acp-chip__label,
+.settings-acp-chip.is-muted .settings-acp-chip__label {
+  color: var(--text-secondary);
+}
+
+.settings-netprobe__target-chip {
+  grid-column: 1 / -1;
+  justify-self: start;
+  max-width: 100%;
+}
+
+.settings-proxy-apply {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-input.is-invalid {
+  border-color: var(--danger, #d33);
+}
+
+.settings-netprobe__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.settings-netprobe__item {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 8px 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated, var(--bg-input));
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.settings-netprobe__mark {
+  font-weight: 600;
+  width: 1em;
+  text-align: center;
+}
+
+.settings-netprobe__item.is-ok .settings-netprobe__mark {
+  color: var(--success, #3d9a5f);
+}
+
+.settings-netprobe__item.is-fail .settings-netprobe__mark {
+  color: var(--danger, #d33);
+}
+
+.settings-netprobe__key {
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: lowercase;
+}
+
+.settings-netprobe__url {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.settings-netprobe__meta {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.settings-netprobe__item.is-fail .settings-netprobe__meta {
+  color: var(--danger, #d33);
+}
+
+@media (max-width: 560px) {
+  .settings-netprobe__item {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "mark key"
+      "url url"
+      "meta meta";
+  }
+
+  .settings-netprobe__mark {
+    grid-area: mark;
+  }
+
+  .settings-netprobe__key {
+    grid-area: key;
+  }
+
+  .settings-netprobe__url {
+    grid-area: url;
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .settings-netprobe__meta {
+    grid-area: meta;
+    white-space: normal;
+  }
+}
+
+.settings-acp-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-acp-field .settings-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-acp-field .settings-input.is-invalid {
+  border-color: var(--danger, #d33);
+}
+
+.settings-acp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated, var(--bg-input));
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.settings-acp-chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-tertiary);
+}

@@ -1,0 +1,953 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+.tree-l3__actions {
+  position: absolute;
+  right: 2px;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  padding-left: 6px;
+  padding-right: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+/* pin + archive + menu — width from content, not reserved layout */
+.tree-l3__actions--triple {
+  width: auto;
+  min-width: 0;
+}
+
+/* Match session rows: hover, or keyboard focus on the action buttons.
+   Do NOT use .tree-l2:focus-within — the row itself is focusable
+   (role=button), so a click would keep trailing icons stuck on. */
+.tree-l2:hover .tree-l2__actions,
+.tree-l2:has(.tree-l2__actions:focus-within) .tree-l2__actions,
+.tree-l2--select-mode .tree-l2__actions--select-mode {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tree-l3:hover .tree-l3__actions,
+.tree-l3:has(.tree-l3__actions:focus-within) .tree-l3__actions {
+  opacity: 1;
+  /* The container ignores clicks; only icon buttons receive them. */
+  pointer-events: none;
+}
+
+.tree-l3:hover .tree-l3__actions > *,
+.tree-l3:has(.tree-l3__actions:focus-within) .tree-l3__actions > * {
+  pointer-events: auto;
+}
+
+/* The metadata column yields to the actions; the title reserves their width. */
+.tree-l3:hover .tree-l3__time,
+.tree-l3:has(.tree-l3__actions:focus-within) .tree-l3__time {
+  display: none;
+}
+
+.tree-l3:hover:has(.tree-l3__actions):not(.tree-l3--renaming)
+  .tree-l3__title,
+.tree-l3:has(.tree-l3__actions:focus-within):not(.tree-l3--renaming)
+  .tree-l3__title {
+  box-sizing: border-box;
+  padding-right: 80px;
+}
+
+.tree-icon-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tree-icon-btn:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+/*
+ * Project / Other-sessions disclosure. Inline height/min/max px (see
+ * treeReveal.ts) interpolate; 0fr/1fr snaps in WKWebView. Padding stays
+ * on .tree-l3-list-wrap so a closed section does not leave leftover inset.
+ */
+.tree-reveal {
+  overflow: clip;
+  /* Flex item default min-height:auto refuses height:0 in WKWebView. */
+  min-height: 0;
+  transition:
+    height var(--motion-normal) var(--motion-pane-ease),
+    min-height var(--motion-normal) var(--motion-pane-ease),
+    max-height var(--motion-normal) var(--motion-pane-ease);
+}
+
+.tree-reveal__inner {
+  overflow: hidden;
+}
+
+.tree-reveal .tree-l3 {
+  content-visibility: visible;
+  contain: none;
+}
+
+/* Collapsing the list leaves a stale overlay thumb (and WKWebView's
+ * native indicator) until the next hover. Hide both while height moves. */
+.sidebar__scroll:has([data-tree-reveal-motion]) .overlay-scroll__thumb {
+  opacity: 0;
+  transition: none;
+}
+
+.sidebar__scroll:has([data-tree-reveal-motion]) .overlay-scroll__viewport {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-reveal {
+    transition: none;
+  }
+}
+
+/* Outer wrap keeps trust hint / empty state outside the windowed list. */
+.tree-l3-list-wrap {
+  padding: 2px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tree-l3-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Block wrap so Other-sessions reveal is not a flex item of the sidebar column. */
+.tree-orphan {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Orphan sessions under Other (same row metrics and left inset as project L3). */
+.tree-orphan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Relative-date section under a project / Other (Today / Yesterday / …). */
+.tree-date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tree-date-group + .tree-date-group {
+  margin-top: 4px;
+}
+
+.tree-date-group__head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 6px 0 var(--tree-text-inset);
+  margin: 0;
+  box-sizing: border-box;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 22px;
+  color: var(--text-tertiary);
+  /* Prefer solid so rows do not show through sticky heads on translucent sidebars. */
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border-subtle, transparent) 70%, transparent);
+  user-select: none;
+  pointer-events: none;
+}
+
+html[data-sidebar-density="compact"] .tree-date-group__head {
+  height: 18px;
+  min-height: 18px;
+  line-height: 18px;
+  font-size: 10px;
+}
+
+.virtual-list__spacer {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.tree-l3 {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  box-sizing: border-box;
+  padding: 0 6px 0 var(--tree-text-inset);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transform: translateZ(0);
+  /* Offscreen rows skip paint work in long virtualized lists. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 36px;
+  contain: layout style;
+}
+
+.tree-l3.tree-l3--nested {
+  padding-left: calc(var(--tree-text-inset) + 14px);
+}
+
+.tree-l3:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tree-l3--active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.tree-l3--archived {
+  opacity: 0.55;
+}
+
+.tree-l3--hint {
+  font-size: 12px;
+  color: var(--warning);
+  height: 28px;
+  min-height: 28px;
+}
+
+.tree-l3--more {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  height: 28px;
+  min-height: 28px;
+}
+
+.tree-l3--more:hover {
+  color: var(--text-secondary);
+}
+
+.tree-l3__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  line-height: 30px;
+}
+
+.tree-l3__kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  opacity: 0.9;
+}
+
+/* Unread dot: background chat finished a turn while not viewed.
+   Independent of mute — muted sessions still show this when a turn completes. */
+.tree-l3__unread {
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent, #6b9fff);
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--accent, #6b9fff) 28%, transparent);
+}
+
+.tree-l3--unread .tree-l3__name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Plan pending review / re-park — decorative chip; does not change row hit targets. */
+.tree-l3__plan-pending {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  color: color-mix(in srgb, var(--warning, #e8a838) 92%, var(--text-primary));
+  background: color-mix(in srgb, var(--warning, #e8a838) 16%, transparent);
+  pointer-events: none;
+}
+
+/* Muted desktop-notify badge — soft pill so it stays readable next to unread. */
+.tree-l3__muted {
+  color: var(--text-tertiary);
+  opacity: 1;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-tertiary) 12%, transparent);
+}
+
+.tree-l3--unread .tree-l3__muted {
+  /* Mute never hides unread — keep both indicators legible together. */
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent, #6b9fff) 12%, transparent);
+}
+
+/* Compact worktree-bound session badge (sidebar). */
+.tree-l3__wt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-tertiary) 28%, transparent);
+  opacity: 0.95;
+}
+
+/* CLI home (`~/.grok/worktrees`) — slightly accented so it is distinct from sibling WT. */
+.tree-l3__wt--cli {
+  color: var(--accent, var(--text-secondary));
+  background: color-mix(in srgb, var(--accent, var(--text-tertiary)) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent, var(--text-tertiary)) 32%, transparent);
+}
+
+.tree-l3__name {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Off-flow measure of a single title copy (natural width, no ellipsis). */
+.tree-l3__name-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: none;
+}
+
+/* At rest: single-line ellipsis (loop copy hidden). */
+.tree-l3__name-text {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-l3__name-seg {
+  white-space: nowrap;
+}
+
+.tree-l3__name-loop {
+  display: none;
+}
+
+.tree-l3__name-gap {
+  display: inline-block;
+  width: var(--marquee-gap, 28px);
+  flex-shrink: 0;
+}
+
+.tree-l3__rename {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  padding: 0 6px;
+  border: 1px solid var(--border-subtle, var(--glass-border));
+  border-radius: 4px;
+  background: var(--bg-app, var(--bg-elevated));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: inherit;
+  line-height: 20px;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.tree-l3__rename:focus,
+.tree-l3__rename:focus-visible {
+  border-color: var(--accent, var(--text-primary));
+  outline: none;
+  box-shadow: none;
+}
+
+.tree-l3--renaming {
+  opacity: 1;
+  cursor: default;
+}
+
+.tree-l3--renaming .tree-l3__actions,
+.tree-l3--renaming .tree-l3__time,
+.tree-l3--renaming .tree-l3__status {
+  display: none;
+}
+
+/*
+ * One-way seamless marquee: only forward (left).
+ * Hold at start → scroll through full loop (title + gap) → seamless restart.
+ * Second title copy makes the wrap look continuous — never reverse.
+ */
+@keyframes tree-l3-marquee {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(var(--marquee-shift, 0px));
+  }
+}
+
+.tree-l3:hover .tree-l3__name--scrollable {
+  overflow: hidden;
+}
+
+.tree-l3:hover .tree-l3__name--scrollable .tree-l3__name-text {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+  animation: tree-l3-marquee 9s linear infinite;
+  will-change: transform;
+}
+
+.tree-l3:hover .tree-l3__name--scrollable .tree-l3__name-loop {
+  display: inline-flex;
+  align-items: baseline;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-l3:hover .tree-l3__name--scrollable .tree-l3__name-text {
+    animation: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+
+  .tree-l3:hover .tree-l3__name--scrollable .tree-l3__name-loop {
+    display: none;
+  }
+}
+
+/* Relative updated time — one-line muted meta (does not change VirtualList row height). */
+.tree-l3__time {
+  flex-shrink: 0;
+  max-width: 7.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* In-progress session: always-visible spinner on the right (replaces hover actions). */
+.tree-l3__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.tree-l3__spinner {
+  color: var(--accent, var(--text-secondary));
+}
+
+.tree-l3--working .tree-l3__title {
+  color: var(--text-primary);
+}
+
+/* Sidebar multi-select: checkbox + selected row */
+.tree-l3__check {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong, var(--border-subtle));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.tree-l3__check.is-on {
+  background: var(--accent, var(--text-primary));
+  border-color: var(--accent, var(--text-primary));
+}
+
+.tree-l3--select-mode {
+  padding-left: 8px;
+}
+
+.tree-l3--checked {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.tree-l3--select-mode:hover {
+  background: var(--bg-hover);
+}
+
+.tree-l3--select-mode.tree-l3--checked:hover {
+  background: var(--bg-active);
+}
+
+/* Sticky strip above user footer while multi-select is on */
+.sidebar-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar, var(--bg-elevated, var(--bg-primary)));
+}
+
+.sidebar-select-bar__count {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-select-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.tree-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 4px 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-check:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+/* Search palette (command palette — top-anchored modal) */
+.search-panel {
+  width: min(520px, 92vw);
+  max-height: min(70vh, 560px);
+  margin: 12vh auto 0;
+  /* Material from unified glass surface */
+  border-radius: var(--modal-radius, 16px);
+  display: flex;
+  flex-direction: column;
+  /* Clip to radius; hits scroll in .search-panel__results (not here). */
+  overflow: hidden;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.search-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.search-panel__input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Palette owns focus; no global input focus ring inside the search field */
+.search-panel__input:focus,
+.search-panel__input:focus-visible {
+  outline: none !important;
+  box-shadow: none;
+}
+
+/* Mode chips + include-archived toggle under the search field */
+.search-panel__filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/*
+ * Sole vertical scrollport for palette hits. Without this, max-height +
+ * overflow:hidden on .search-panel clips rows and wheel/trackpad do nothing
+ * (same trap as automations #543).
+ */
+.search-panel__results {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.search-panel__results .overlay-scroll__viewport {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 6px;
+}
+
+.search-panel__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-panel__mode {
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.search-panel__mode:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.search-panel__mode.is-active {
+  border-color: color-mix(in srgb, var(--accent, #6b8cff) 30%, transparent);
+  background: color-mix(in srgb, var(--accent, #6b8cff) 14%, transparent);
+  color: var(--text-primary);
+  font-weight: 560;
+}
+
+.search-panel__archived {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.search-panel__archived input {
+  margin: 0;
+  accent-color: var(--accent, #6b8cff);
+}
+
+.search-panel__filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.search-panel__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.search-panel__mode {
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.search-panel__mode:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.search-panel__mode.is-active {
+  border-color: color-mix(in srgb, var(--accent, #6b8cff) 30%, transparent);
+  background: color-mix(in srgb, var(--accent, #6b8cff) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.search-panel__rank-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-tertiary);
+}
+
+.search-panel__clear-filters {
+  margin: 0;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent, #6b8cff);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.search-panel__clear-filters:hover {
+  background: color-mix(in srgb, var(--accent, #6b8cff) 12%, transparent);
+}
+
+.search-panel__empty {
+  padding: 12px 14px 14px;
+}
+
+.search-panel__empty-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.search-panel__empty-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.search-panel__empty-clear {
+  margin-top: 10px;
+}
+
+.search-panel__section {
+  padding: 10px 14px 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.search-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 520;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  flex-shrink: 0;
+  text-transform: none;
+}
+
+.search-panel__badge--content {
+  border-color: color-mix(in srgb, var(--accent, #6b8cff) 28%, transparent);
+  background: color-mix(in srgb, var(--accent, #6b8cff) 10%, transparent);
+  color: var(--text-secondary);
+}
+
+.search-panel__badge--both {
+  border-color: color-mix(in srgb, var(--accent, #6b8cff) 36%, transparent);
+  background: color-mix(in srgb, var(--accent, #6b8cff) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.search-panel__row {
+  display: flex;
+  align-items: center;
+  gap: var(--menu-item-gap, 10px);
+  width: 100%;
+  margin: 0 2px;
+  padding: var(--menu-item-pad-y, 8px) var(--menu-item-pad-x, 12px);
+  border-radius: var(--menu-item-radius, 8px);
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: var(--menu-font, 13px);
+  box-sizing: border-box;
+}
+
+.search-panel__row:hover,
+.search-panel__row.is-active {
+  background: var(--menu-hover);
+  color: var(--text-primary);
+}
+
+.search-panel__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-panel__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  max-width: 100%;
+}
+
+.search-panel__title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-panel__snippet {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-panel__meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-panel__foot {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+  padding-bottom: 6px;
+}
+
+.session-mru-panel {
+  width: min(400px, 92vw);
+  max-height: min(56vh, 420px);
+  margin: 0;
+}
+.session-mru-panel .search-panel__head {
+  align-items: flex-start;
+}
+.session-mru-panel__hint {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-tertiary);
+}
+.session-mru-panel .search-panel__results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+.session-mru-panel .search-panel__row {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+.session-mru-panel .search-panel__row:hover:not(.is-active) {
+  background: var(--menu-hover);
+}
+.session-mru-panel .search-panel__row.is-active {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}

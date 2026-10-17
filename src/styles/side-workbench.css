@@ -1,0 +1,7 @@
+/**
+ * Side Workbench — thin deltas on top of ResourceViewer `.rp` / `.rp-chrome`.
+ * Do NOT re-skin chrome/tabs; those come from composer.part3.css.
+ */
+@import "./side-workbench.part1.css";
+@import "./side-workbench.part2.css";
+@import "./side-workbench.part3.css";

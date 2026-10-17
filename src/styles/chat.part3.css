@@ -1,0 +1,857 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+
+
+.attach-chip__main:hover .attach-chip__name {
+  color: var(--text-primary);
+}
+
+/*
+ * Remove control: solid dark disc at top-right, half outside the card.
+ * Avoid --bg-active — near-transparent and “vanishes” on hover.
+ */
+.attach-chip__x {
+  --x-size: 16px;
+  position: absolute;
+  top: calc(var(--x-size) / -2);
+  right: calc(var(--x-size) / -2);
+  width: var(--x-size);
+  height: var(--x-size);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    transform 0.12s ease;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.attach-chip:hover .attach-chip__x,
+.attach-chip:focus-within .attach-chip__x,
+.attach-chip__x:hover,
+.attach-chip__x:focus-visible {
+  opacity: 1;
+}
+
+.attach-chip__x:hover,
+.attach-chip__x:focus-visible {
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  transform: scale(1.06);
+}
+
+/* Message attachment cards */
+.message__user-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.message__atts {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: min(100%, 70%);
+}
+
+.message__atts--assistant {
+  justify-content: flex-start;
+  align-items: center;
+  max-width: 100%;
+  margin-top: 4px;
+}
+
+/*
+ * Message attachments
+ * - Image: 36×36 square
+ * - File / folder: height 36px, width follows name (max capped)
+ */
+.att-card {
+  --attach-h: 36px;
+  --attach-file-max-w: 220px;
+  position: relative;
+  height: var(--attach-h);
+  min-height: var(--attach-h);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
+}
+
+.att-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--bg-elevated) var(--ui-opacity-mix, 100%),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.att-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.att-card--image {
+  width: var(--attach-h);
+  flex: 0 0 var(--attach-h);
+}
+
+.att-card:not(.att-card--image) {
+  width: max-content;
+  max-width: var(--attach-file-max-w);
+  flex: 0 1 auto;
+}
+
+.att-card--dir {
+  border-color: rgba(80, 180, 120, 0.3);
+}
+
+.att-card--dir::before {
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, rgba(80, 180, 120, 0.08) 100%, var(--bg-elevated))
+      var(--ui-opacity-mix, 100%),
+    transparent
+  );
+}
+
+.att-card__btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* File row */
+.att-card:not(.att-card--image) .att-card__btn {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px 0 8px;
+  text-align: left;
+}
+
+.att-card__btn--image {
+  padding: 0;
+  justify-content: center;
+}
+
+.att-card__btn:hover {
+  background: var(--bg-hover);
+}
+
+.att-card__btn--image:hover {
+  background: transparent;
+  filter: brightness(0.96);
+}
+
+.att-card__thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--bg-hover);
+}
+
+.att-card__thumb--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-tertiary);
+}
+
+.att-card__thumb--fail,
+.att-card--preview-fail .att-card__thumb--placeholder {
+  background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--text-tertiary) 45%, transparent);
+  color: var(--text-tertiary);
+}
+
+.att-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.att-card--dir .att-card__icon {
+  color: rgb(50, 150, 100);
+  background: rgba(80, 180, 120, 0.12);
+}
+
+.att-card__meta {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  overflow: hidden;
+}
+
+.att-card__name {
+  max-width: 160px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+  text-align: left;
+}
+
+/* Markdown inline images — STABLE CHAT FRAME
+ *
+ * Chat cards: fixed 150px height (inline style) so image decode / natural-ratio
+ * discovery never changes vertical layout (virtual list + stick-to-bottom).
+ * Width follows ratio (≤240). Image absolute-fills with object-fit:contain.
+ * Resource pane uses natural aspect-ratio instead (no chat caps).
+ */
+.md-body__img-frame {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  margin: 10px 0;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+  vertical-align: middle;
+  /* Chat cards set height inline; pane leaves auto + aspect-ratio */
+  height: auto;
+  /* Isolate paint/layout so decode does not reflow siblings */
+  contain: layout paint;
+}
+
+.md-body__img-frame--card {
+  max-width: min(100%, 240px);
+  /* Floor before JS style lands — matches CHAT_IMAGE_CARD_MAX_H */
+  min-height: 150px;
+  height: 150px;
+  max-height: 150px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+/* Resource sidebar / full-width previews — no chat card cap */
+.md-body__img-frame--pane {
+  width: 100%;
+  max-width: 100%;
+  max-height: none;
+  margin: 0;
+  border-radius: 8px;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.md-body__img-frame__el {
+  display: block;
+  /* Absolute fill: % height of aspect-ratio boxes is unreliable in WebKit */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Box matches natural ratio → contain fills without crop or letterbox */
+  object-fit: contain;
+  object-position: center;
+  border: none;
+  margin: 0;
+  padding: 0;
+  border-radius: inherit;
+  cursor: zoom-in;
+  opacity: 1;
+}
+
+.md-body__img-frame.is-pending {
+  background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+}
+
+.md-body__img-frame.is-broken {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--bg-hover) 60%, transparent);
+}
+
+.md-body__img-frame__fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  text-align: center;
+  word-break: break-all;
+}
+
+/* Legacy class names still applied via ImageUi className props */
+.md-body__img-pending,
+.md-body__img-broken {
+  /* Kept as no-ops if any external CSS still references them */
+  display: none;
+}
+
+.md-body__img,
+.md-body__img--card {
+  /* Size lives on .md-body__img-frame--card; bare img rules must not fight it */
+  max-width: 100%;
+}
+
+/* Path-in-place video card (replaces `videos/1.mp4` / links)
+ *
+ * Stage always has a non-zero reserved size (default 16:9 via JS aspect-ratio).
+ * Video is absolute-fill so metadata load / stream remounts do not thrash
+ * scrollHeight (that thrash + stick-to-bottom follow = chat flicker).
+ */
+.md-body__video-card {
+  display: block;
+  box-sizing: border-box;
+  max-width: min(100%, 360px);
+  margin: 10px 0;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.md-body__video-card__stage {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* Height from aspect-ratio (inline); never leave an empty collapsing box */
+  height: auto;
+  background: #000;
+  overflow: hidden;
+}
+
+.md-body__video-card__el {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: #000;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.md-body__video-card__placeholder,
+.md-body__video-card__error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+  color: var(--text-secondary);
+  font-size: 13px;
+  background: color-mix(in srgb, var(--bg-hover) 80%, #000 20%);
+}
+
+/* Click-to-play poster — no full video media:// until user starts. */
+.md-body__video-card__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--bg-hover) 80%, #000 20%);
+  transition: background 0.15s ease;
+  overflow: hidden;
+}
+.md-body__video-card__poster.has-cover {
+  background: #000;
+}
+.md-body__video-card__poster:hover {
+  background: color-mix(in srgb, var(--bg-hover) 60%, #000 40%);
+}
+.md-body__video-card__poster.has-cover:hover .md-body__video-card__poster-shade {
+  background: rgba(0, 0, 0, 0.42);
+}
+.md-body__video-card__poster:focus-visible {
+  outline: 2px solid var(--text-link, #3b82f6);
+  outline-offset: -2px;
+}
+/* Cached still from host ffmpeg / client canvas — not a full video stream. */
+.md-body__video-card__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+.md-body__video-card__poster-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.15) 0%,
+    rgba(0, 0, 0, 0.35) 55%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+  pointer-events: none;
+  transition: background 0.15s ease;
+}
+.md-body__video-card__poster:not(.has-cover) .md-body__video-card__poster-shade {
+  display: none;
+}
+.md-body__video-card__play {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #fff 22%, transparent);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  padding-left: 3px; /* optical center for ▶ */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.md-body__video-card__name,
+.md-body__video-card__hint {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+.md-body__video-card__hint {
+  font-size: 12px;
+  color: color-mix(in srgb, #fff 78%, transparent);
+}
+.md-body__video-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.md-body__video-card__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.md-body__video-card__caption {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-top: 1px solid var(--border-subtle);
+  /* Fixed caption band so presence of title doesn't reflow after first paint */
+  min-height: 28px;
+  box-sizing: border-box;
+}
+
+.md-body__video-card__btn {
+  font-size: 12px;
+  color: var(--text-link, #3b82f6);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Streamdown / markdown may wrap replaced media in p — keep card block */
+.sd-body p:has(> .md-body__img--card),
+.sd-body p:has(> .md-body__img-frame),
+.sd-body p:has(> .md-body__video-card),
+.chat-md p:has(> .md-body__img-frame),
+.chat-md p:has(> .md-body__video-card) {
+  margin-block: 0.35em;
+}
+
+/*
+ * File / URL path — inline chip。聊天消息与输入框**共用**这一份外观：
+ * 蓝底蓝字，圆角矩形，悬停提示完整路径（title）。
+ *
+ * 配色规则：底色与描边是同一个蓝（`--chat-link`，输入框里回落到 `--accent`）
+ * 以 `transparent` 打底的 color-mix 叠层，所以在深色 / 浅色 / 壁纸主题、
+ * 以及灰色用户气泡上都能自适应；文字就是**加深背景前的那支蓝**（`--chat-link`），
+ * 与底色同色相，靠蓝底把它的识别度和对比度一起抬起来。
+ */
+.file-path-card {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 0 2px;
+  padding: 0 6px 0 5px;
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--chat-link, var(--accent)) 30%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--chat-link, var(--accent)) 12%, transparent);
+  box-shadow: none;
+  overflow: visible;
+  color: var(--chat-link, var(--accent));
+  vertical-align: middle;
+}
+
+.file-path-card__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: inherit;
+}
+
+.file-path-card__main:hover {
+  background: transparent;
+  color: var(--chat-link-hover, var(--accent-hover, #8fc4f5));
+}
+
+.file-path-card__main:hover .file-path-card__name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.file-path-card__main:disabled {
+  cursor: default;
+  opacity: 1; /* no dim flash while resolving on click */
+}
+
+.file-path-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  margin-right: 0.28em;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}
+
+.file-path-card--url .file-path-card__icon,
+.file-path-card--dir .file-path-card__icon {
+  color: inherit;
+  background: none;
+}
+
+.file-path-card__meta {
+  display: inline;
+  min-width: 0;
+}
+
+.file-path-card__name {
+  display: inline;
+  font-size: inherit;
+  font-weight: 500;
+  color: inherit;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+  line-height: inherit;
+}
+
+.file-path-card--original .file-path-card__name {
+  white-space: normal;
+  word-break: break-all;
+}
+
+/* Details dialog for file / URL cards */
+.file-path-details-overlay {
+  z-index: 13000;
+}
+
+.file-path-details {
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(80vh, 520px);
+  display: flex;
+  flex-direction: column;
+}
+
+.file-path-details__head {
+  flex-shrink: 0;
+}
+
+.file-path-details__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.file-path-details__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.file-path-details__label {
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--text-tertiary);
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+.file-path-details__value {
+  font-size: 13px;
+  color: var(--text-primary);
+  word-break: break-all;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.file-path-details__mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+}
+
+.file-path-details__value--warn {
+  color: var(--text-danger, #f87171);
+}
+
+.file-path-details__actions {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.att-menu {
+  position: fixed;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--menu-context-gap, 1px);
+}
+
+.att-menu__item {
+  /* global menu row */
+}
+
+.composer__input {
+  width: 100%;
+  /* Default = 2 rows; overridden by html[data-composer-min-rows] (Settings). */
+  min-height: 44px;
+  max-height: 220px; /* ~10 lines */
+  resize: none;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  overflow-y: auto;
+  /* room for floating native thumb (track stays transparent) */
+  padding: 2px 10px 2px 4px;
+  field-sizing: content;
+}
+
+/*
+ * Composer empty min-height (Settings → General → Composer).
+ * Prefer html[data-composer-min-rows] so every composer instance picks it up.
+ * Values = approximate text rows × 22px line-height.
+ */
+html[data-composer-min-rows="2"] .composer__input {
+  min-height: 44px;
+}
+html[data-composer-min-rows="3"] .composer__input {
+  min-height: 66px;
+}
+html[data-composer-min-rows="5"] .composer__input {
+  min-height: 110px;
+}
+html[data-composer-min-rows="8"] .composer__input {
+  min-height: 176px;
+}
+
+/*
+ * 「rich HTML 落进来就剥掉样式」防御规则（ADR 0004 后重新**只对内置档**生效）。
+ *
+ * 它来自自研 contenteditable 时代：那时输入框内容是可以被任意 HTML 污染的纯文本
+ * DOM，所以把 b/strong/i/em/u/s/font/a 与未白名单的 span 一律强制 `inherit`。
+ * 内置档仍是这样一块 contenteditable，因此这条防御必须留着——上游行为逐项一致。
+ *
+ * Markdown 档（TipTap）不需要它：内容由 ProseMirror schema 约束，且
+ * `Markdown.configure({ html: false, transformPastedText: true })` 不保留粘贴的任意
+ * HTML。反过来，它在那档是有害的——会把**粗体、斜体、下划线、删除线、链接**
+ * 全部压成普通文本，「所见即所得」不成立，也会把引用 / URL chip 的底色按掉。
+ *
+ * 两档的输入框都带 `.composer__input`，用 `.ProseMirror`（TipTap 独有）区分。
+ */
+.composer-editor-wrap > .composer__input:not(.ProseMirror) b,
+.composer-editor-wrap > .composer__input:not(.ProseMirror) strong,
+.composer-editor-wrap > .composer__input:not(.ProseMirror) i,
+.composer-editor-wrap > .composer__input:not(.ProseMirror) em,
+.composer-editor-wrap > .composer__input:not(.ProseMirror) u,
+.composer-editor-wrap > .composer__input:not(.ProseMirror) s,
+.composer-editor-wrap
+  > .composer__input:not(.ProseMirror)
+  span:not([data-skill]):not(.skill-chip):not(.skill-chip__name):not(.skill-chip__glyph),
+.composer-editor-wrap > .composer__input:not(.ProseMirror) font,
+.composer-editor-wrap > .composer__input:not(.ProseMirror) a {
+  font: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  color: inherit !important;
+  background: transparent !important;
+  text-decoration: none !important;
+  letter-spacing: inherit !important;
+  border: none !important;
+}
+
+.composer__input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.composer__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+  min-height: 32px;
+  /* Do not use overflow-x:auto here — it clips absolute/portaled popovers
+     and was hiding the model menu (only a bottom shadow was visible). */
+  overflow: visible;
+  /* Same named query as the chrome row. The field is a sibling, not a child. */
+  container-type: inline-size;
+  container-name: composer;
+}
+
+.composer__voice.composer__voice--live {
+  color: var(--danger, #e55);
+  animation: composer-voice-pulse 1.1s ease-in-out infinite;
+}
+
+.composer__voice.composer__voice--busy {
+  opacity: 0.65;
+}
+
+/* Auth / provider gate soft-unavailable — still clickable for toast honesty. */
+.composer__voice.composer__voice--unavailable {
+  opacity: 0.45;
+}
+
+@keyframes composer-voice-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Flat chips (project etc.) — no capsule border, hover wash only */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 8px;
+  position: relative;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  max-width: 140px;
+  flex-shrink: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.chip--ask {
+  color: var(--text-secondary);
+}

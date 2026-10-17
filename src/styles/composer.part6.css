@@ -1,0 +1,708 @@
+/* domain CSS chunk (move-only split; selectors unchanged) */
+/*
+ * 输入框内的 Markdown 结构与行内引用 chip（ADR 0004）。
+ *
+ * 从 `modals.part1.css` **原样搬来**（同一条规则、同一顺序，只换文件）：那份文件
+ * 已越过「禁止新增 ≥1000 行文件」的体量闸门，而这些规则本就属于 composer 域。
+ * 加载顺序不变——`app.css` 里 `chat.css` → `composer.css` → `modals.css`，
+ * 搬到 composer 域后仍晚于 `chat.css`，且 composer 域内没有同选择器的竞争者。
+ */
+/* Composer 内的 Markdown 元素保持紧凑行高与输入框视觉 */
+.composer__input p {
+  margin: 0;
+  line-height: 22px;
+}
+/*
+ * 输入框内的 Markdown 结构与行内样式。
+ *
+ * 对齐基准是聊天消息（`.chat-md`，见 lobe-chat.part1b.css）：**配色、描边、
+ * 圆角、字重、纹理**与聊天侧一致，**行长与间距**保留输入框自己的紧凑密度
+ * （聊天是阅读区，输入框是输入区，密度需求本就不同）。
+ * 颜色一律用 app token——聊天侧那些 `--chat-*` 变量本身就只是它们的别名。
+ */
+.composer__input strong {
+  /* 聊天侧是 600，不是浏览器默认的 bolder(700)。 */
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.composer__input h1,
+.composer__input h2,
+.composer__input h3 {
+  margin: 4px 0 2px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+.composer__input h1 {
+  font-size: 1.25em;
+}
+.composer__input h2 {
+  font-size: 1.12em;
+}
+.composer__input h3 {
+  font-size: 1.05em;
+}
+.composer__input ul,
+.composer__input ol {
+  margin: 0;
+  padding-left: 1.4em;
+  /* list-style 的补偿在 settings.part6.css（Tailwind preflight 全局重置）。 */
+}
+.composer__input li {
+  line-height: 22px;
+}
+.composer__input pre {
+  margin: 4px 0;
+  padding: 6px 8px;
+  /* 圆角与配色对齐聊天侧代码块；内边距/行高保留输入框的紧凑密度。 */
+  border-radius: 10px;
+  background: var(--bg-code);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+/* 代码块语言栏：只显示语言，不搬聊天侧的复制按钮（输入框里「复制自己的草稿」
+ * 用处有限，且会把输入框的紧凑密度压掉）。文案来自 codeBlock 节点上的
+ * `data-language` 装饰器（composerExtensions.ts），字体/配色对齐聊天侧
+ * `.chat-code__lang`。 */
+.composer__input pre[data-language]::before {
+  content: attr(data-language);
+  display: block;
+  /* 通栏：抵消 pre 的 padding，顶到圆角边框内侧。 */
+  margin: -6px -8px 6px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 10px 10px 0 0;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  user-select: none;
+}
+
+.composer__input pre code {
+  /* 代码块内的 code 不再叠一层行内代码的底色、描边与圆角。 */
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.composer__input code {
+  /* 对齐聊天侧 .chat-md__inline-code 的行内代码 chip。 */
+  padding: 0.12em 0.5em;
+  border-radius: 6px;
+  background: var(--md-inline-code-bg, rgba(255, 255, 255, 0.14));
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9em;
+  font-weight: 500;
+}
+.composer__input a {
+  /* 对齐 .chat-md__link：默认不着色下划线，悬停才出现。
+   * 输入框里鼠标仍是文本光标——点击应当定位光标，不是打开浏览器。 */
+  color: var(--accent);
+  text-decoration: none;
+  cursor: text;
+}
+.composer__input a:hover {
+  color: var(--accent-hover, var(--accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/*
+ * 内联引用 chip：输入框里点它应当定位光标，不是打开文件。
+ * 悬停的完整路径走节点自带的 title 属性。
+ *
+ * **外观（蓝底蓝字 + 圆角矩形）不在这里定义** —— 聊天消息与输入框共用
+ * `chat.part3.css` 里的 `.file-path-card`（见那里的配色说明）。这里只写
+ * 输入框需要的差异：点它=定位光标（不做链接下划线）、悬停加深底色、
+ * 选中态描边走 `--accent`、长路径在 chip 内截断。
+ */
+.composer__input .file-path-card--editor {
+  padding-right: 7px;
+}
+.composer__input .file-path-card--editor:hover {
+  background: color-mix(in srgb, var(--chat-link, var(--accent)) 20%, transparent);
+}
+.composer__input .file-path-card--editor.ProseMirror-selectednode {
+  border-color: var(--chat-link, var(--accent));
+}
+.composer__input .file-path-card--editor .file-path-card__main {
+  max-width: 100%;
+  color: inherit;
+  cursor: text;
+  user-select: none;
+}
+.composer__input .file-path-card--editor .file-path-card__main:hover {
+  background: transparent;
+  color: inherit;
+}
+.composer__input .file-path-card--editor .file-path-card__main:hover .file-path-card__name {
+  text-decoration: none;
+}
+.composer__input .file-path-card--editor .file-path-card__icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.88;
+}
+.composer__input .file-path-card--editor .file-path-card__name {
+  overflow: hidden;
+  /* 长路径不能把一行撑爆：chip 内截断，完整值在 title 里。 */
+  max-width: 24ch;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer__input blockquote {
+  margin: 2px 0;
+  padding-left: 10px;
+  /* 对齐 .chat-md blockquote 的 2px + --border-subtle。 */
+  border-left: 2px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+/*
+ * hr 保持输入框原有外观，不对齐聊天侧。
+ * 聊天侧**故意**不渲染分割线（.chat-md hr { display: none } + MarkdownChat
+ * 的 MdHr 返回 null），而输入框必须让用户看见自己敲下的 `---`，否则就是
+ * 看不见的内容。这是输入框渲染里唯一一处有意的不对齐，不要当 bug 改掉。
+ */
+.composer__input hr {
+  margin: 6px 0;
+  border: 0;
+  /* 原先用的是一个从未定义的边框 token（一直走 fallback），改用真实 token。 */
+  border-top: 1px solid var(--border-strong);
+}
+.office-preview__sheets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+
+.office-preview__sheet-tab {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.office-preview__sheet-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.office-preview__sheet-tab.is-active {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.office-preview__sheet-scroll {
+  background: var(--bg-card);
+}
+
+.office-preview__sheet-scroll table {
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 100%;
+  color: var(--text-primary);
+}
+
+.office-preview__sheet-scroll td,
+.office-preview__sheet-scroll th {
+  border: 1px solid var(--border-subtle);
+  padding: 4px 8px;
+  white-space: pre-wrap;
+  max-width: 280px;
+  vertical-align: top;
+}
+
+.office-preview__sheet-scroll th {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+/* ===== Scheduled automations page (Codex-style 已安排) ===== */
+.auto-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /*
+   * Must allow page-level scroll when fixed chrome (head / honesty / LaunchAgent
+   * / one-shot / history) exceeds the viewport. overflow:hidden clipped those
+   * flex-shrink:0 blocks with no scroll container → #543 (wheel/trackpad dead).
+   * Task list still scrolls inside .auto-page__body when it has remaining height.
+   */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.auto-page__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 8px;
+  flex-shrink: 0;
+}
+
+.auto-page__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.auto-page__status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 12rem;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.22));
+  background: var(--bg-elevated, rgba(127, 127, 127, 0.08));
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.auto-page__status-pill:hover {
+  opacity: 0.92;
+}
+
+.auto-page__status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-tertiary);
+}
+
+.auto-page__status-pill--ok {
+  border-color: color-mix(in srgb, var(--success, #30a46c) 35%, transparent);
+  background: color-mix(in srgb, var(--success, #30a46c) 10%, transparent);
+  color: var(--text-primary);
+}
+
+.auto-page__status-pill--ok .auto-page__status-dot {
+  background: var(--success, #30a46c);
+}
+
+.auto-page__status-pill--warn {
+  border-color: color-mix(in srgb, var(--warning, #d4a017) 40%, transparent);
+  background: color-mix(in srgb, var(--warning, #d4a017) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.auto-page__status-pill--warn .auto-page__status-dot {
+  background: var(--warning, #d4a017);
+}
+
+.auto-page__status-pill--idle .auto-page__status-dot {
+  background: var(--text-tertiary);
+}
+
+.auto-page__status-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auto-page__settings-btn {
+  flex-shrink: 0;
+}
+
+.auto-page__tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 24px 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.14));
+}
+
+.auto-page__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.auto-page__tab:hover {
+  color: var(--text-secondary);
+}
+
+.auto-page__tab.is-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
+}
+
+.auto-page__inbox--tab {
+  flex: 1;
+  min-height: 0;
+  margin: 8px 24px 12px;
+  max-height: none;
+  overflow: auto;
+}
+
+.auto-page__inbox--tab .auto-page__history-list {
+  max-height: none;
+}
+
+/* Scrollable body slot inside GlassModal (footer stays pinned). */
+.auto-page__settings-body {
+  min-height: 0;
+  /* Extra air under last row so content isn't flush against the footer rule */
+  padding-bottom: 4px;
+}
+
+.auto-page__settings-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.auto-page__settings-modal .auto-page__bg-rows {
+  margin: 0;
+  /* Nested cards scroll with the modal body, not as a second locked pane */
+  overflow: visible;
+}
+
+.auto-page__settings-modal .auto-page__bg-row {
+  /* Keep switch aligned while long descriptions wrap */
+  align-items: flex-start;
+}
+
+.auto-page__settings-modal .auto-page__bg-row-desc {
+  /* Prefer soft wrap over mid-word cuts when possible */
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.auto-page__settings-flag {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-tertiary);
+}
+
+.auto-page__settings-advanced-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: var(--bg-elevated, rgba(127, 127, 127, 0.05));
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.auto-page__settings-advanced-toggle:hover {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.1));
+}
+
+.auto-page__settings-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auto-page__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.auto-page__subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  max-width: 42em;
+}
+
+/* Honest background / quit status when enabled scheduled tasks exist. */
+.auto-page__bg-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+  margin: 4px 24px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.22));
+  background: var(--bg-elevated, rgba(127, 127, 127, 0.08));
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.auto-page__bg-banner--info {
+  border-color: color-mix(in srgb, var(--accent, #3b82f6) 28%, transparent);
+  background: color-mix(in srgb, var(--accent, #3b82f6) 10%, transparent);
+}
+
+.auto-page__bg-banner--warn {
+  border-color: color-mix(
+    in srgb,
+    var(--warning, #d4a017) 35%,
+    transparent
+  );
+  background: color-mix(in srgb, var(--warning, #d4a017) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.auto-page__bg-banner-text {
+  margin: 0;
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.auto-page__bg-banner-link {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-link, #3b82f6);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.auto-page__bg-banner-link:hover {
+  opacity: 0.88;
+}
+
+/* Background runner honesty + keep-tray / LaunchAgent controls */
+.auto-page__bg-panel {
+  flex-shrink: 0;
+  margin: 4px 24px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auto-page__bg-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.22));
+  background: var(--bg-elevated, rgba(127, 127, 127, 0.08));
+  color: var(--text-secondary);
+}
+
+.auto-page__bg-banner--info {
+  border-color: color-mix(in srgb, var(--accent, #3b82f6) 28%, transparent);
+  background: color-mix(in srgb, var(--accent, #3b82f6) 10%, transparent);
+}
+
+.auto-page__bg-banner--warn {
+  border-color: color-mix(
+    in srgb,
+    var(--warning, #d4a017) 35%,
+    transparent
+  );
+  background: color-mix(in srgb, var(--warning, #d4a017) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.auto-page__bg-banner-text {
+  margin: 0;
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.auto-page__bg-banner-link {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-link, #3b82f6);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.auto-page__bg-banner-link:hover {
+  opacity: 0.88;
+}
+
+.auto-page__bg-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 2px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: var(--bg-elevated, rgba(127, 127, 127, 0.05));
+}
+
+.auto-page__bg-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.auto-page__bg-row + .auto-page__bg-row {
+  border-top: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.12));
+}
+
+.auto-page__bg-row-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.auto-page__bg-row-label {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-primary);
+}
+
+.auto-page__bg-row-desc {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.auto-page__bg-row-desc--muted {
+  opacity: 0.88;
+  font-size: 11.5px;
+}
+
+.auto-page__bg-row-actions {
+  margin-top: 6px;
+}
+
+/* AUTO-HEADLESS-LITE honesty matrix + runner pause reason */
+.auto-page__honesty {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.18));
+  background: var(--bg-elevated, rgba(127, 127, 127, 0.04));
+}
+
+.auto-page__honesty-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.auto-page__honesty-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auto-page__honesty-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.auto-page__honesty-item-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.auto-page__honesty-item-body {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.auto-page__runner-reason {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.auto-page__runner-reason--info {
+  color: var(--text-secondary);
+}
+
+.auto-page__runner-reason--warn {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.auto-page__fail-detail {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  max-height: 9rem;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.22));
+  background: var(--bg-sunken, rgba(0, 0, 0, 0.18));
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11.5px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary);
+}
+

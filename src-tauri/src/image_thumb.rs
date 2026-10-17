@@ -1,0 +1,730 @@
+//! Cached chat image thumbnails.
+//!
+//! Chat virtual-list remounts re-request media URLs often. Serving full multi-MB
+//! originals over loopback is wasteful. We materialize a small JPEG under
+//! `{app_data}/cache/image-thumbs/{hash}.jpg` keyed by:
+//! - local file: path + mtime + size
+//! - remote https: URL string
+//!
+//! Card UI loads the thumb via loopback media; lightbox still uses the original.
+
+use std::fs;
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
+
+use image::imageops::FilterType;
+use image::{DynamicImage, ImageReader, Limits};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+
+use crate::path_scope;
+use crate::paths;
+
+/// Longest edge for chat card thumbs (display max 240px; 2× for Retina).
+const THUMB_MAX_EDGE: u32 = 480;
+
+/// Remote wallpaper bytes are untrusted and may encode extreme dimensions in
+/// a small response. Keep one decode bounded while still accepting 8K media.
+pub(crate) const UNTRUSTED_THUMB_MAX_DIMENSION: u32 = 16_384;
+pub(crate) const UNTRUSTED_THUMB_MAX_PIXELS: u64 = 50_000_000;
+const UNTRUSTED_THUMB_MAX_ALLOC: u64 = 256 * 1024 * 1024;
+
+/// Skip re-encode when source is already small enough (bytes).
+const SKIP_IF_SMALLER_THAN: u64 = 96 * 1024; // 96 KiB
+
+/// Remote download cap.
+const MAX_REMOTE_BYTES: u64 = 12 * 1024 * 1024;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageThumbResult {
+    /// Absolute path of the JPEG thumb (or original when we skip re-encode).
+    pub thumb_path: String,
+    pub from_cache: bool,
+    /// Natural pixel size of the **source** (for aspect cache), when known.
+    pub width: u32,
+    pub height: u32,
+    /// True when `thumb_path` is the original file (not a resized thumb).
+    pub is_original: bool,
+}
+
+pub fn image_thumbs_dir() -> PathBuf {
+    paths::image_thumbs_dir()
+}
+
+fn hash_hex(bytes: &[u8]) -> String {
+    let dig = Sha256::digest(bytes);
+    dig.iter().take(20).map(|b| format!("{b:02x}")).collect()
+}
+
+fn local_cache_key(path: &Path, mtime_secs: u64, size: u64) -> String {
+    let mut h = Sha256::new();
+    let norm = path.to_string_lossy().replace('\\', "/");
+    h.update(b"local\0");
+    h.update(norm.as_bytes());
+    h.update(b"\0");
+    h.update(mtime_secs.to_le_bytes());
+    h.update(size.to_le_bytes());
+    h.update(b"\0");
+    h.update(THUMB_MAX_EDGE.to_le_bytes());
+    hash_hex(&h.finalize())
+}
+
+fn remote_cache_key(url: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(b"remote\0");
+    h.update(url.trim().as_bytes());
+    h.update(b"\0");
+    h.update(THUMB_MAX_EDGE.to_le_bytes());
+    hash_hex(&h.finalize())
+}
+
+fn thumb_path_for_key(key: &str) -> PathBuf {
+    image_thumbs_dir().join(format!("{key}.jpg"))
+}
+
+fn file_meta(path: &Path) -> Result<(u64, u64), String> {
+    let meta = fs::metadata(path).map_err(|e| format!("stat: {e}"))?;
+    if !meta.is_file() {
+        return Err("not a file".into());
+    }
+    let size = meta.len();
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Ok((mtime, size))
+}
+
+fn looks_like_image(path: &Path) -> bool {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "tif" | "tiff" | "heic" | "avif"
+    )
+}
+
+fn resize_to_thumb(img: DynamicImage) -> DynamicImage {
+    let (w, h) = (img.width(), img.height());
+    if w == 0 || h == 0 {
+        return img;
+    }
+    let long = w.max(h);
+    if long <= THUMB_MAX_EDGE {
+        return img;
+    }
+    let scale = THUMB_MAX_EDGE as f32 / long as f32;
+    let nw = ((w as f32) * scale).round().max(1.0) as u32;
+    let nh = ((h as f32) * scale).round().max(1.0) as u32;
+    img.resize(nw, nh, FilterType::Triangle)
+}
+
+fn encode_jpeg(img: &DynamicImage) -> Result<Vec<u8>, String> {
+    let rgb = img.to_rgb8();
+    let mut buf = Cursor::new(Vec::new());
+    let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 78);
+    enc.encode(
+        rgb.as_raw(),
+        rgb.width(),
+        rgb.height(),
+        image::ExtendedColorType::Rgb8,
+    )
+    .map_err(|e| format!("jpeg encode: {e}"))?;
+    Ok(buf.into_inner())
+}
+
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("create thumb dir: {e}"))?;
+    }
+    let tmp = path.with_extension("jpg.partial");
+    fs::write(&tmp, bytes).map_err(|e| format!("write thumb: {e}"))?;
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("rename thumb: {e}")
+    })?;
+    Ok(())
+}
+
+/// Sidecar next to `{hash}.jpg` so a cache hit can return **source** width/height
+/// without decoding the original (or even the thumb).
+fn dims_sidecar_path(thumb: &Path) -> PathBuf {
+    thumb.with_extension("dims")
+}
+
+fn write_source_dims_sidecar(thumb: &Path, width: u32, height: u32) {
+    if width == 0 || height == 0 {
+        return;
+    }
+    let _ = fs::write(dims_sidecar_path(thumb), format!("{width} {height}\n"));
+}
+
+fn read_source_dims_sidecar(thumb: &Path) -> Option<(u32, u32)> {
+    let raw = fs::read_to_string(dims_sidecar_path(thumb)).ok()?;
+    let mut parts = raw.split_whitespace();
+    let width = parts.next()?.parse::<u32>().ok()?;
+    let height = parts.next()?.parse::<u32>().ok()?;
+    if width > 0 && height > 0 {
+        Some((width, height))
+    } else {
+        None
+    }
+}
+
+/// Header-only dimensions from a cached JPEG thumb (old cache without sidecar).
+/// Never opens the original file.
+fn thumb_header_dims(thumb: &Path) -> Option<(u32, u32)> {
+    let reader = image::ImageReader::open(thumb)
+        .ok()?
+        .with_guessed_format()
+        .ok()?;
+    let (w, h) = reader.into_dimensions().ok()?;
+    if w > 0 && h > 0 {
+        Some((w, h))
+    } else {
+        None
+    }
+}
+
+fn cached_thumb_dims(thumb: &Path) -> (u32, u32) {
+    read_source_dims_sidecar(thumb)
+        .or_else(|| thumb_header_dims(thumb))
+        .unwrap_or((0, 0))
+}
+
+fn decode_image_bytes(bytes: &[u8]) -> Result<DynamicImage, String> {
+    image::load_from_memory(bytes).map_err(|e| format!("decode image: {e}"))
+}
+
+fn decode_untrusted_image_bytes_with_limits(
+    bytes: &[u8],
+    max_dimension: u32,
+    max_pixels: u64,
+    max_alloc: u64,
+) -> Result<DynamicImage, String> {
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(max_dimension);
+    limits.max_image_height = Some(max_dimension);
+    limits.max_alloc = Some(max_alloc);
+
+    let mut dimensions_reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| format!("decode image dimensions: {e}"))?;
+    dimensions_reader.limits(limits.clone());
+    let (width, height) = dimensions_reader
+        .into_dimensions()
+        .map_err(|e| format!("decode image dimensions: {e}"))?;
+    let pixels = u64::from(width).saturating_mul(u64::from(height));
+    if pixels == 0 || pixels > max_pixels {
+        return Err("decode image: pixel limit exceeded".into());
+    }
+
+    let mut decode_reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| format!("decode image: {e}"))?;
+    decode_reader.limits(limits);
+    decode_reader
+        .decode()
+        .map_err(|e| format!("decode image: {e}"))
+}
+
+/// Decode trusted local image bytes and return a card-size JPEG.
+/// Remote wallpaper callers must use `thumbnail_jpeg_from_untrusted_bytes`.
+pub fn thumbnail_jpeg_from_bytes(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
+    let img = decode_image_bytes(bytes)?;
+    thumbnail_jpeg_from_image(img, bytes.len())
+}
+
+/// Decode untrusted remote wallpaper bytes with strict dimension and allocation
+/// limits, then return the same in-memory card thumbnail shape as local media.
+pub fn thumbnail_jpeg_from_untrusted_bytes(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
+    let img = decode_untrusted_image_bytes_with_limits(
+        bytes,
+        UNTRUSTED_THUMB_MAX_DIMENSION,
+        UNTRUSTED_THUMB_MAX_PIXELS,
+        UNTRUSTED_THUMB_MAX_ALLOC,
+    )?;
+    thumbnail_jpeg_from_image(img, bytes.len())
+}
+
+fn thumbnail_jpeg_from_image(
+    img: DynamicImage,
+    source_bytes: usize,
+) -> Result<(Vec<u8>, u32, u32), String> {
+    let width = img.width();
+    let height = img.height();
+    let long = width.max(height);
+    let thumb_img = if long <= THUMB_MAX_EDGE && source_bytes as u64 <= SKIP_IF_SMALLER_THAN {
+        img
+    } else {
+        resize_to_thumb(img)
+    };
+    let jpeg = encode_jpeg(&thumb_img)?;
+    Ok((jpeg, width, height))
+}
+
+fn build_thumb_from_bytes(bytes: &[u8], out: &Path) -> Result<(u32, u32, bool), String> {
+    let (jpeg, width, height) = thumbnail_jpeg_from_bytes(bytes)?;
+    write_atomic(out, &jpeg)?;
+    write_source_dims_sidecar(out, width, height);
+    Ok((width, height, false))
+}
+
+/// Ensure a chat-card thumb exists for a local absolute path.
+pub fn ensure_local_image_thumb(path: &str) -> Result<ImageThumbResult, String> {
+    let raw = PathBuf::from(path.trim());
+    if raw.as_os_str().is_empty() {
+        return Err("empty path".into());
+    }
+    let canonical = path_scope::require_allowed(&raw)?;
+    if !looks_like_image(&canonical) {
+        return Err("not an image file".into());
+    }
+
+    let (mtime, size) = file_meta(&canonical)?;
+    // Very small local files: serve original (grant + path) without re-encode.
+    if size > 0 && size <= SKIP_IF_SMALLER_THAN {
+        // Still try to read dims for aspect cache.
+        let (w, h) = fs::read(&canonical)
+            .ok()
+            .and_then(|b| decode_image_bytes(&b).ok())
+            .map(|im| (im.width(), im.height()))
+            .unwrap_or((0, 0));
+        path_scope::grant_path(&canonical);
+        return Ok(ImageThumbResult {
+            thumb_path: canonical.to_string_lossy().to_string(),
+            from_cache: true,
+            width: w,
+            height: h,
+            is_original: true,
+        });
+    }
+
+    let key = local_cache_key(&canonical, mtime, size);
+    let out = thumb_path_for_key(&key);
+    if out.is_file() && fs::metadata(&out).map(|m| m.len()).unwrap_or(0) >= 32 {
+        // Source dims from sidecar (or thumb JPEG header). Never decode the
+        // original — that is what froze chat on image-return remounts (#675).
+        let (w, h) = cached_thumb_dims(&out);
+        path_scope::grant_path(&out);
+        return Ok(ImageThumbResult {
+            thumb_path: out.to_string_lossy().to_string(),
+            from_cache: true,
+            width: w,
+            height: h,
+            is_original: false,
+        });
+    }
+
+    let bytes = fs::read(&canonical).map_err(|e| format!("read image: {e}"))?;
+    if bytes.is_empty() {
+        return Err("empty image".into());
+    }
+    let (w, h, _) = build_thumb_from_bytes(&bytes, &out)?;
+    path_scope::grant_path(&out);
+    Ok(ImageThumbResult {
+        thumb_path: out.to_string_lossy().to_string(),
+        from_cache: false,
+        width: w,
+        height: h,
+        is_original: false,
+    })
+}
+
+const REMOTE_DOWNLOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// Reject cleartext / non-URL input before any network I/O.
+fn require_remote_thumb_https_url(url: &str) -> Result<(), String> {
+    let url = url.trim();
+    if url.starts_with("https://") {
+        return Ok(());
+    }
+    if url.starts_with("http://") {
+        return Err("https required".into());
+    }
+    Err("not an http(s) url".into())
+}
+
+/// Download remote image (https) once and cache a chat thumb.
+///
+/// Uses the same hop check + [`crate::safe_https_client::SafeHttpsClient`] path as
+/// wallpaper remote media (DNS pin, private/metadata IP block, redirect re-check).
+pub async fn ensure_remote_image_thumb(url: &str) -> Result<ImageThumbResult, String> {
+    let url = url.trim();
+    require_remote_thumb_https_url(url)?;
+
+    let key = remote_cache_key(url);
+    let out = thumb_path_for_key(&key);
+    if out.is_file() && fs::metadata(&out).map(|m| m.len()).unwrap_or(0) >= 32 {
+        path_scope::grant_path(&out);
+        let (w, h) = cached_thumb_dims(&out);
+        return Ok(ImageThumbResult {
+            thumb_path: out.to_string_lossy().to_string(),
+            from_cache: true,
+            width: w,
+            height: h,
+            is_original: false,
+        });
+    }
+
+    let bytes = download_remote_image_bytes_safe(url).await?;
+    if bytes.is_empty() {
+        return Err("empty remote image".into());
+    }
+
+    let (w, h, _) = build_remote_thumb_from_bytes(&bytes, &out)?;
+    path_scope::grant_path(&out);
+    Ok(ImageThumbResult {
+        thumb_path: out.to_string_lossy().to_string(),
+        from_cache: false,
+        width: w,
+        height: h,
+        is_original: false,
+    })
+}
+
+async fn download_remote_image_bytes_safe(start: &str) -> Result<Vec<u8>, String> {
+    use hyper::header::{HeaderMap, HeaderValue, ACCEPT};
+
+    let policy = crate::skin_net::OriginPolicy::AnyHttps;
+    let client = crate::safe_https_client::SafeHttpsClient::new();
+    let mut current = crate::skin_net::check_hop_async(start, &policy).await?;
+
+    for hop in 0..=crate::skin_net::MAX_REDIRECTS {
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("image/*,*/*;q=0.8"));
+        let mut response = client
+            .get(&current, headers, REMOTE_DOWNLOAD_TIMEOUT)
+            .await
+            .map_err(|e| format!("download: {e}"))?;
+
+        if response.status().is_redirection() {
+            if hop == crate::skin_net::MAX_REDIRECTS {
+                return Err("too many redirects".into());
+            }
+            let location = response
+                .headers()
+                .get(hyper::header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| "redirect missing location".to_string())?;
+            let next = current
+                .join(location)
+                .map_err(|e| format!("redirect join: {e}"))?;
+            current = crate::skin_net::check_hop_async(next.as_str(), &policy).await?;
+            continue;
+        }
+
+        if !response.status().is_success() {
+            return Err(format!("download status {}", response.status()));
+        }
+        if response
+            .content_length()
+            .is_some_and(|len| len > MAX_REMOTE_BYTES)
+        {
+            return Err("remote image too large".into());
+        }
+
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| format!("download body: {e}"))?
+        {
+            if (bytes.len() as u64).saturating_add(chunk.len() as u64) > MAX_REMOTE_BYTES {
+                return Err("remote image too large".into());
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        return Ok(bytes);
+    }
+
+    Err("too many redirects".into())
+}
+
+#[cfg(test)]
+fn read_remote_image_body(reader: impl std::io::Read) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    reader
+        .take(MAX_REMOTE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("download body: {e}"))?;
+    if bytes.len() as u64 > MAX_REMOTE_BYTES {
+        return Err("remote image too large".into());
+    }
+    Ok(bytes)
+}
+
+fn build_remote_thumb_from_bytes(bytes: &[u8], out: &Path) -> Result<(u32, u32, bool), String> {
+    let (jpeg, width, height) = thumbnail_jpeg_from_untrusted_bytes(bytes)?;
+    write_atomic(out, &jpeg)?;
+    write_source_dims_sidecar(out, width, height);
+    Ok((width, height, false))
+}
+
+/// Unified entry: local absolute path or https URL.
+pub async fn ensure_image_thumb(path_or_url: &str) -> Result<ImageThumbResult, String> {
+    let s = path_or_url.trim();
+    if s.is_empty() {
+        return Err("empty path".into());
+    }
+    if s.starts_with("https://") || s.starts_with("http://") {
+        return ensure_remote_image_thumb(s).await;
+    }
+    let local = s.to_string();
+    tokio::task::spawn_blocking(move || ensure_local_image_thumb(&local))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::ImageFormat;
+
+    #[test]
+    fn builds_thumb_from_png_bytes() {
+        let img =
+            DynamicImage::ImageRgb8(image::RgbImage::from_pixel(20, 10, image::Rgb([255, 0, 0])));
+        let mut png = Vec::new();
+        img.write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+        let dir = std::env::temp_dir().join(format!("grok-img-thumb-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let out = dir.join("t.jpg");
+        let (w, h, _) = build_thumb_from_bytes(&png, &out).unwrap();
+        assert_eq!((w, h), (20, 10));
+        assert!(out.is_file());
+        assert!(fs::metadata(&out).unwrap().len() > 32);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn builds_in_memory_thumb_without_persisting() {
+        let img = DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            960,
+            540,
+            image::Rgb([24, 96, 180]),
+        ));
+        let mut png = Vec::new();
+        img.write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+
+        let (jpeg, width, height) = thumbnail_jpeg_from_bytes(&png).unwrap();
+        assert_eq!((width, height), (960, 540));
+        assert!(jpeg.starts_with(&[0xff, 0xd8, 0xff]));
+        assert!(jpeg.len() < 512 * 1024);
+        let decoded = image::load_from_memory(&jpeg).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (480, 270));
+    }
+
+    #[test]
+    fn untrusted_thumbnail_decode_rejects_excessive_pixel_count() {
+        let img = DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            20,
+            10,
+            image::Rgb([24, 96, 180]),
+        ));
+        let mut png = Vec::new();
+        img.write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+
+        let error = decode_untrusted_image_bytes_with_limits(&png, 64, 100, 1024 * 1024)
+            .expect_err("pixel count must be bounded before decoding");
+        assert_eq!(error, "decode image: pixel limit exceeded");
+
+        assert!(decode_untrusted_image_bytes_with_limits(&png, 16, 1_000, 1024 * 1024).is_err());
+    }
+
+    #[test]
+    fn remote_body_stops_after_one_byte_over_the_limit() {
+        use std::io::Read;
+        let oversized = std::io::repeat(1).take(MAX_REMOTE_BYTES + 100);
+        assert_eq!(
+            read_remote_image_body(oversized).unwrap_err(),
+            "remote image too large"
+        );
+        assert_eq!(read_remote_image_body(Cursor::new(b"abc")).unwrap(), b"abc");
+    }
+
+    #[test]
+    fn remote_thumb_requires_https_and_blocks_private_hops() {
+        use std::net::{IpAddr, Ipv4Addr};
+
+        assert_eq!(
+            require_remote_thumb_https_url("http://cdn.example.com/a.png").unwrap_err(),
+            "https required"
+        );
+        assert!(require_remote_thumb_https_url("https://cdn.example.com/a.png").is_ok());
+
+        let blocked = crate::skin_net::check_hop(
+            "https://10.0.0.5/secret.png",
+            &crate::skin_net::OriginPolicy::AnyHttps,
+            |_| Ok(vec![IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5))]),
+        )
+        .unwrap_err();
+        assert!(
+            blocked.contains("private")
+                || blocked.contains("metadata")
+                || blocked.contains("blocked"),
+            "unexpected block reason: {blocked}"
+        );
+
+        let loopback = crate::skin_net::check_hop(
+            "https://127.0.0.1/x.png",
+            &crate::skin_net::OriginPolicy::AnyHttps,
+            |_| Ok(vec![IpAddr::V4(Ipv4Addr::LOCALHOST)]),
+        )
+        .unwrap_err();
+        assert!(
+            loopback.contains("private")
+                || loopback.contains("metadata")
+                || loopback.contains("localhost")
+                || loopback.contains("blocked"),
+            "unexpected loopback reason: {loopback}"
+        );
+    }
+
+    #[test]
+    fn remote_thumb_download_does_not_use_bare_reqwest() {
+        let src = include_str!("image_thumb.rs");
+        let production = src
+            .split("mod tests {")
+            .next()
+            .expect("production image_thumb source");
+        assert!(
+            production.contains("SafeHttpsClient"),
+            "chat remote thumbs must use SafeHttpsClient"
+        );
+        let needle = ["reqwest", "::", "blocking", "::", "Client"].concat();
+        assert!(
+            !production.contains(&needle),
+            "chat remote thumbs must not build a bare reqwest client"
+        );
+    }
+
+    #[test]
+    fn untrusted_decoder_checks_allocation_and_preserves_thumbnail_dimensions() {
+        let img = DynamicImage::ImageRgb8(image::RgbImage::new(960, 540));
+        let mut png = Vec::new();
+        img.write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+        assert!(decode_untrusted_image_bytes_with_limits(&png, 16384, 50_000_000, 1024).is_err());
+        let (jpeg, width, height) = thumbnail_jpeg_from_untrusted_bytes(&png).unwrap();
+        assert_eq!((width, height), (960, 540));
+        let decoded = image::load_from_memory(&jpeg).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (480, 270));
+        assert!(thumbnail_jpeg_from_untrusted_bytes(b"not an image").is_err());
+    }
+
+    #[test]
+    fn remote_and_local_keys_differ() {
+        let a = remote_cache_key("https://cdn.example.com/a.png");
+        let b = remote_cache_key("https://cdn.example.com/b.png");
+        assert_ne!(a, b);
+        let p = PathBuf::from("/tmp/x.png");
+        let k1 = local_cache_key(&p, 1, 100);
+        let k2 = local_cache_key(&p, 2, 100);
+        assert_ne!(k1, k2);
+    }
+
+    fn write_noisy_png_larger_than_skip(path: &Path) -> (u32, u32) {
+        let (w, h) = (640u32, 480u32);
+        let mut img = image::RgbImage::new(w, h);
+        for (x, y, p) in img.enumerate_pixels_mut() {
+            *p = image::Rgb([
+                (x.wrapping_mul(37) % 256) as u8,
+                (y.wrapping_mul(53) % 256) as u8,
+                ((x + y).wrapping_mul(17) % 256) as u8,
+            ]);
+        }
+        DynamicImage::ImageRgb8(img)
+            .save_with_format(path, ImageFormat::Png)
+            .unwrap();
+        let size = fs::metadata(path).unwrap().len();
+        assert!(
+            size > SKIP_IF_SMALLER_THAN,
+            "fixture too small to leave the skip-reencode path: {size}"
+        );
+        (w, h)
+    }
+
+    #[test]
+    fn cache_hit_returns_source_dims_without_decoding_original() {
+        let _scope = crate::path_scope::TEST_LOCK.blocking_lock();
+        let _home = crate::paths::APP_HOME_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let dir = std::env::temp_dir().join(format!(
+            "grok-img-thumb-hit-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let app = dir.join("app");
+        fs::create_dir_all(&app).unwrap();
+        let prev_home = std::env::var("GROK_APP_HOME").ok();
+        std::env::set_var("GROK_APP_HOME", &app);
+        let src = dir.join("big.png");
+        let (src_w, src_h) = write_noisy_png_larger_than_skip(&src);
+        let src_str = src.to_string_lossy().to_string();
+
+        let miss = ensure_local_image_thumb(&src_str).expect("cache miss");
+        assert!(!miss.is_original);
+        assert_eq!((miss.width, miss.height), (src_w, src_h));
+        assert!(Path::new(&miss.thumb_path).is_file());
+        assert!(dims_sidecar_path(Path::new(&miss.thumb_path)).is_file());
+
+        let meta = fs::metadata(&src).unwrap();
+        let size = meta.len();
+        let mtime = meta.modified().unwrap();
+        // Same size + mtime so the cache key still hits, but the bytes are
+        // no longer a valid image. A cache hit that re-decodes the original
+        // would lose dimensions (or error).
+        fs::write(&src, vec![0u8; size as usize]).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&src)
+            .unwrap()
+            .set_modified(mtime)
+            .unwrap();
+
+        let hit = ensure_local_image_thumb(&src_str).expect("cache hit");
+        assert!(hit.from_cache);
+        assert_eq!(hit.thumb_path, miss.thumb_path);
+        assert_eq!((hit.width, hit.height), (src_w, src_h));
+        assert!(hit.width > 0 && hit.height > 0);
+
+        match prev_home {
+            Some(v) => std::env::set_var("GROK_APP_HOME", v),
+            None => std::env::remove_var("GROK_APP_HOME"),
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cached_thumb_dims_fall_back_to_jpeg_header() {
+        let dir = std::env::temp_dir().join(format!("grok-img-thumb-hdr-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let out = dir.join("only.jpg");
+        let img =
+            DynamicImage::ImageRgb8(image::RgbImage::from_pixel(32, 16, image::Rgb([1, 2, 3])));
+        let jpeg = encode_jpeg(&img).unwrap();
+        write_atomic(&out, &jpeg).unwrap();
+        assert!(read_source_dims_sidecar(&out).is_none());
+        assert_eq!(cached_thumb_dims(&out), (32, 16));
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
