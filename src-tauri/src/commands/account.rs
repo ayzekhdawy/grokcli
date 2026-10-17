@@ -86,7 +86,7 @@ pub async fn account_open_subscribe() -> Result<(), String> {
 // ── Multi-account profiles ─────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn accounts_list() -> crate::account_profiles::AccountsListResult {
+pub fn accounts_list() -> crate::account_profiles::AccountsListResult {
     crate::account_profiles::list_accounts()
 }
 
@@ -96,7 +96,7 @@ pub async fn accounts_quota() -> crate::account_profiles::AccountsQuotaResult {
 }
 
 #[tauri::command]
-pub async fn account_save_current(
+pub fn account_save_current(
     label: Option<String>,
 ) -> Result<crate::account_profiles::SavedAccount, String> {
     crate::account_profiles::save_current_account(label)
@@ -116,12 +116,12 @@ pub async fn account_switch(
 }
 
 #[tauri::command]
-pub async fn account_remove(id: String) -> Result<(), String> {
+pub fn account_remove(id: String) -> Result<(), String> {
     crate::account_profiles::remove_account(&id)
 }
 
 #[tauri::command]
-pub async fn account_rename(
+pub fn account_rename(
     id: String,
     label: String,
 ) -> Result<crate::account_profiles::SavedAccount, String> {
@@ -130,7 +130,7 @@ pub async fn account_rename(
 
 /// Import a markdown/JSON transcript into a new local session (Grok web history alternative).
 #[tauri::command]
-pub async fn session_import_transcript(
+pub fn session_import_transcript(
     text: String,
     title: Option<String>,
     project_id: Option<String>,
