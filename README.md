@@ -1,3 +1,12 @@
+# GrokCLI
+
+> **Fork notice:** GrokCLI is a fork of [RongleCat/grok-app](https://github.com/RongleCat/grok-app) (MIT) with stability fixes:
+> - `session/load` sends `_meta.noReplay` so reopening very large chats skips the transcript replay (opt out: `GROK_APP_FULL_REPLAY=1`)
+> - separate 150s session/load timeout and wider connect/handshake budgets
+> - own identifier/data dir (`com.noniux.grokcli`) so it runs beside the original app
+>
+> Original copyright and MIT license retained (see LICENSE).
+
 <p align="center">
   <img src="assets/logo.png" alt="Grok App Logo" width="128" height="128" />
 </p>
