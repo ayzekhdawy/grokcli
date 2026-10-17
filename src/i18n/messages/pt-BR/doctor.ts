@@ -352,7 +352,7 @@ export const ptBRDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Inventário em texto simples do conteúdo do zip para o destinatário.",
   "reliability.supportZip.emptyHostOnly": "O zip de suporte precisa do app de desktop",
-  "reliability.supportZip.emptyHostOnlyHint": "A exportação roda só no host Tauri — abra o Grok App no desktop para montar um zip de suporte redigido.",
+  "reliability.supportZip.emptyHostOnlyHint": "A exportação roda só no host Tauri — abra o GrokCLI no desktop para montar um zip de suporte redigido.",
   "reliability.supportZip.failHostOnly": "O zip de suporte precisa do app de desktop (indisponível no navegador)",
   "reliability.supportZip.failCancel": "Zip de suporte cancelado",
   "reliability.supportZip.failIo": "Não foi possível gravar o zip de suporte (disco ou permissão)",

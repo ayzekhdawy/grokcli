@@ -187,7 +187,7 @@ export const ruSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI старше {min} — ключ может игнорироваться (мягкий сбой).",
   "settings.lspTools.banner.hostOnly": "Нужен настольный Host.",
   "settings.lspTools.banner.softRespawn": "Сохранение пишет config.toml и мягко перезапускает агента, чтобы флаг подхватился.",
-  "settings.lspTools.banner.noAppLsp": "Grok App само языковые серверы не запускает.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI само языковые серверы не запускает.",
   "settings.lspTools.banner.agentToolsOnly": "Только инструменты агента CLI, когда включено и серверы настроены.",
   "settings.lspTools.banner.noDiagnostics": "Приложение пока не показывает живую диагностику.",
   "settings.lspTools.refresh": "Обновить",

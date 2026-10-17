@@ -352,7 +352,7 @@ export const filDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Simpleng inventory ng nilalaman ng zip para sa tatanggap.",
   "reliability.supportZip.emptyHostOnly": "Kailangan ng desktop app ang support zip",
-  "reliability.supportZip.emptyHostOnlyHint": "Tumatakbo lang ang pag-export sa Tauri host — buksan ang Grok App sa desktop para bumuo ng naka-redact na support zip.",
+  "reliability.supportZip.emptyHostOnlyHint": "Tumatakbo lang ang pag-export sa Tauri host — buksan ang GrokCLI sa desktop para bumuo ng naka-redact na support zip.",
   "reliability.supportZip.failHostOnly": "Kailangan ng desktop app ang support zip (hindi available sa browser)",
   "reliability.supportZip.failCancel": "Nakansela ang support zip",
   "reliability.supportZip.failIo": "Hindi masulat ang support zip (disk o pahintulot)",

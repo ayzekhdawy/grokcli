@@ -50,7 +50,7 @@ export const trSidebar = {
   "sidebar.archiveSelectedTitle": "Sohbetleri arşivle",
   "sidebar.restoreSelectedTitle": "Sohbetleri geri yükle",
   "sidebar.archiveSelectedConfirm": "{n} sohbet arşivlensin mi? Daha sonra Ayarlar → Arşiv bölümünden geri yükleyebilirsiniz.",
-  "sidebar.archiveCliHint": "Bu işlem sohbeti yalnızca Grok App'te gizler. Siz silene kadar terminaldeki CLI listesinde görünmeye devam eder.",
+  "sidebar.archiveCliHint": "Bu işlem sohbeti yalnızca GrokCLI'te gizler. Siz silene kadar terminaldeki CLI listesinde görünmeye devam eder.",
   "sidebar.restoreSelectedConfirm": "{n} sohbet kenar çubuğuna geri yüklensin mi?",
   "sidebar.archivedToast": "{n} sohbet arşivlendi",
   "sidebar.restoredToast": "{n} sohbet geri yüklendi",

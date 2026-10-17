@@ -109,7 +109,7 @@ export const enAccount = {
   "account.loginUnreachableHint": "If your grok CLI is already signed in, switch Session data mode to shared (~/.grok) to reuse it. On restricted networks, launch with a proxy.",
   "account.loginOk": "Signed in",
   "account.loginHelpTitle": "Login tips",
-  "account.loginHelpBody": "Normal path: finish sign-in in the browser; Grok App detects success automatically. If Access denied / cannot generate a code: try another network or VPN, Device code login, or a custom provider. Only if the page asks you to copy a code into Grok Build, expand the paste field below while “Waiting for browser” is still active.",
+  "account.loginHelpBody": "Normal path: finish sign-in in the browser; GrokCLI detects success automatically. If Access denied / cannot generate a code: try another network or VPN, Device code login, or a custom provider. Only if the page asks you to copy a code into Grok Build, expand the paste field below while “Waiting for browser” is still active.",
   "account.loginTryDevice": "Try device code instead",
   "account.profiles": "Accounts",
   "account.profilesHint": "Switch between saved Grok Build logins on this device. Snapshots store auth only.",

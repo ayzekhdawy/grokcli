@@ -352,7 +352,7 @@ export const koDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "수신자를 위한 zip 내용의 일반 인벤토리.",
   "reliability.supportZip.emptyHostOnly": "지원 zip은 데스크톱 앱이 필요합니다",
-  "reliability.supportZip.emptyHostOnlyHint": "내보내기는 Tauri 호스트에서만 실행됩니다 — 마스킹된 지원 zip을 만들려면 데스크톱에서 Grok App을 여세요.",
+  "reliability.supportZip.emptyHostOnlyHint": "내보내기는 Tauri 호스트에서만 실행됩니다 — 마스킹된 지원 zip을 만들려면 데스크톱에서 GrokCLI을 여세요.",
   "reliability.supportZip.failHostOnly": "지원 zip은 데스크톱 앱이 필요합니다(브라우저에서는 사용할 수 없음)",
   "reliability.supportZip.failCancel": "지원 zip이 취소되었습니다",
   "reliability.supportZip.failIo": "지원 zip을 쓰지 못했습니다(디스크 또는 권한)",

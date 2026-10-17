@@ -109,7 +109,7 @@ export const filAccount = {
   "account.loginUnreachableHint": "Kung naka-sign in na ang iyong grok CLI, palitan ang Session data mode sa shared (~/.grok) para magamit ulit ito. Sa mahigpit na network, maglunsad na may proxy.",
   "account.loginOk": "Naka-sign in",
   "account.loginHelpTitle": "Mga tip sa pag-login",
-  "account.loginHelpBody": "Normal na paraan: tapusin ang pag-sign in sa browser; awtomatikong matutukoy ng Grok App ang tagumpay. Kung Access denied / hindi makabuo ng code: subukan ang ibang network o VPN, Device code login, o custom provider. Kung hinihiling ng page na kopyahin ang code sa Grok Build, palawakin ang paste field sa ibaba habang naka-“Naghihintay sa browser” pa.",
+  "account.loginHelpBody": "Normal na paraan: tapusin ang pag-sign in sa browser; awtomatikong matutukoy ng GrokCLI ang tagumpay. Kung Access denied / hindi makabuo ng code: subukan ang ibang network o VPN, Device code login, o custom provider. Kung hinihiling ng page na kopyahin ang code sa Grok Build, palawakin ang paste field sa ibaba habang naka-“Naghihintay sa browser” pa.",
   "account.loginTryDevice": "Subukan na lang ang device code",
   "account.profiles": "Mga account",
   "account.profilesHint": "Lumipat sa mga naka-save na login ng Grok Build sa device na ito. Auth lang ang sine-save ng mga snapshot.",

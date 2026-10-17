@@ -148,7 +148,7 @@ export const taSettings = {
   "settings.cliUpdateInstallFailed": "புதுப்பிப்பு தோல்வியடைந்தது: {error}",
   "settings.cliUpdateNeedCli": "முதலில் CLI ஐ நிறுவவும் அல்லது கண்டுபிடிக்கவும்.",
   "settings.cliUpdate.appBehindTitle": "CLIக்கு முன் App-ஐப் புதுப்பிக்கவும்",
-  "settings.cliUpdate.appBehindMsg": "இந்த App {app}, ஆனால் {latestApp} கிடைக்கிறது (CLI {cli}க்கு குறைந்தது {minApp}). CLI மட்டும் புதுப்பித்தால் இணக்கச் சிக்கல்கள் வரலாம். முதலில் Grok App-ஐப் புதுப்பிக்கவும், அல்லது தொடரவும்.",
+  "settings.cliUpdate.appBehindMsg": "இந்த App {app}, ஆனால் {latestApp} கிடைக்கிறது (CLI {cli}க்கு குறைந்தது {minApp}). CLI மட்டும் புதுப்பித்தால் இணக்கச் சிக்கல்கள் வரலாம். முதலில் GrokCLI-ஐப் புதுப்பிக்கவும், அல்லது தொடரவும்.",
   "settings.cliUpdate.appBehindConfirm": "எப்படியும் தொடரவும்",
   "settings.acpServer": "ACP சர்வர் (API பயன்முறை)",
   "settings.acpServerDesc": "உள்ளூர் CLI ஐ உருவாக்குவதற்குப் பதிலாக TCPக்கு மேல் உள்ள தொலைநிலை ACP முகவருடன் இணைக்கவும் (ஹோஸ்ட்:போர்ட்) — எ.கா. WSL இல் உள்ள ஒரு முகவர், ஒரு கொள்கலன் அல்லது மற்றொரு ஹோஸ்ட். உள்ளூர் ஸ்பான்களுக்கு காலியாக விடவும்.",

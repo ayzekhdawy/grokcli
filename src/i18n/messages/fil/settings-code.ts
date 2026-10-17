@@ -187,7 +187,7 @@ export const filSettingsCode = {
   "settings.lspTools.banner.cliOld": "Mas luma ang CLI kaysa {min} — maaaring hindi pansinin ang key (soft-fail).",
   "settings.lspTools.banner.hostOnly": "Kailangan ang desktop host.",
   "settings.lspTools.banner.softRespawn": "Nagsusulat ang pag-save ng config.toml at nagso-soft-respawn sa agent para makuha ang flag.",
-  "settings.lspTools.banner.noAppLsp": "Hindi mismo nagpapatakbo ang Grok App ng language server.",
+  "settings.lspTools.banner.noAppLsp": "Hindi mismo nagpapatakbo ang GrokCLI ng language server.",
   "settings.lspTools.banner.agentToolsOnly": "Mga tool ng CLI agent lang kapag naka-enable at naka-configure ang mga server.",
   "settings.lspTools.banner.noDiagnostics": "Hindi pa nagpapakita ang App ng live na diagnostics.",
   "settings.lspTools.refresh": "I-refresh",

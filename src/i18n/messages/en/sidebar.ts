@@ -50,7 +50,7 @@ export const enSidebar = {
   "sidebar.archiveSelectedTitle": "Archive chats",
   "sidebar.restoreSelectedTitle": "Restore chats",
   "sidebar.archiveSelectedConfirm": "Archive {n} chats? You can restore them later from Settings → Archived.",
-  "sidebar.archiveCliHint": "This only hides the chat in Grok App. The terminal CLI list still shows it until you delete.",
+  "sidebar.archiveCliHint": "This only hides the chat in GrokCLI. The terminal CLI list still shows it until you delete.",
   "sidebar.restoreSelectedConfirm": "Restore {n} chats to the sidebar?",
   "sidebar.archivedToast": "Archived {n} chats",
   "sidebar.restoredToast": "Restored {n} chats",

@@ -109,7 +109,7 @@ export const jaAccount = {
   "account.loginUnreachableHint": "grok CLI が既にサインイン済みなら、セッションデータモードを共有（~/.grok）にして再利用してください。制限のあるネットワークではプロキシ付きで起動してください。",
   "account.loginOk": "サインインしました",
   "account.loginHelpTitle": "サインインのヒント",
-  "account.loginHelpBody": "通常: ブラウザでサインインを完了すると、Grok App が成功を自動検出します。Access denied / コードを生成できない場合: 別のネットワークや VPN、デバイスコードログイン、またはカスタムプロバイダーを試してください。「コードを Grok Build にコピー」とページが求めたときだけ、「ブラウザを待っています」のあいだ下の貼り付け欄を展開してください。",
+  "account.loginHelpBody": "通常: ブラウザでサインインを完了すると、GrokCLI が成功を自動検出します。Access denied / コードを生成できない場合: 別のネットワークや VPN、デバイスコードログイン、またはカスタムプロバイダーを試してください。「コードを Grok Build にコピー」とページが求めたときだけ、「ブラウザを待っています」のあいだ下の貼り付け欄を展開してください。",
   "account.loginTryDevice": "代わりにデバイスコードを試す",
   "account.profiles": "アカウント",
   "account.profilesHint": "このデバイスに保存した Grok Build ログインを切り替えます。スナップショットは認証だけを保存します。",

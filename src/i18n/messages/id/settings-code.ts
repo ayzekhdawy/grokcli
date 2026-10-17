@@ -187,7 +187,7 @@ export const idSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI lebih lama dari {min} — kunci mungkin diabaikan (gagal lunak).",
   "settings.lspTools.banner.hostOnly": "Host desktop diperlukan.",
   "settings.lspTools.banner.softRespawn": "Menyimpan menulis config.toml dan me-respawn lunak agen agar flag diambil.",
-  "settings.lspTools.banner.noAppLsp": "Grok App tidak menjalankan server bahasa sendiri.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI tidak menjalankan server bahasa sendiri.",
   "settings.lspTools.banner.agentToolsOnly": "Hanya alat agen CLI saat diaktifkan dan server dikonfigurasi.",
   "settings.lspTools.banner.noDiagnostics": "App belum menampilkan diagnostik langsung.",
   "settings.lspTools.refresh": "Segarkan",

@@ -237,7 +237,7 @@ export const ukWorkspace = {
   "changes.workspace.loadError": "Не вдалося завантажити стан git робочої області",
   "changes.workspace.loadErrorHint": "Перевірте шлях проєкту й спробуйте оновити. Зміни інструментів сесії все одно з’являються вище, коли вони є.",
   "changes.workspace.hostOnly": "Стан git робочої області потребує настільного застосунку",
-  "changes.workspace.hostOnlyHint": "Відкрийте настільний Grok App, щоб інспектувати зміни робочої області.",
+  "changes.workspace.hostOnlyHint": "Відкрийте настільний GrokCLI, щоб інспектувати зміни робочої області.",
   "changes.workspace.unavailableHint": "Стан git для цього проєкту не вдалося прочитати.",
   "changes.workspace.refresh": "Оновити стан робочої області",
   "changes.workspace.branch": "На {branch}",

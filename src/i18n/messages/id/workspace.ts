@@ -237,7 +237,7 @@ export const idWorkspace = {
   "changes.workspace.loadError": "Status git ruang kerja tidak dapat dimuat",
   "changes.workspace.loadErrorHint": "Periksa jalur proyek lalu coba segarkan. Suntingan alat sesi tetap muncul di atas jika ada.",
   "changes.workspace.hostOnly": "Status git ruang kerja memerlukan aplikasi desktop",
-  "changes.workspace.hostOnlyHint": "Buka Grok App desktop untuk memeriksa perubahan ruang kerja.",
+  "changes.workspace.hostOnlyHint": "Buka GrokCLI desktop untuk memeriksa perubahan ruang kerja.",
   "changes.workspace.unavailableHint": "Status git tidak dapat dibaca untuk proyek ini.",
   "changes.workspace.refresh": "Segarkan status ruang kerja",
   "changes.workspace.branch": "Di {branch}",

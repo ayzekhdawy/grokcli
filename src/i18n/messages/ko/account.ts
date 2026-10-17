@@ -109,7 +109,7 @@ export const koAccount = {
   "account.loginUnreachableHint": "이미 grok CLI에 로그인되어 있다면 세션 데이터 모드를 공유(~/.grok)로 바꿔 재사용하세요. 제한된 네트워크에서는 프록시로 실행하세요.",
   "account.loginOk": "로그인됨",
   "account.loginHelpTitle": "로그인 팁",
-  "account.loginHelpBody": "일반적인 경로: 브라우저에서 로그인을 마치면 Grok App이 성공을 자동으로 감지합니다. Access denied / 코드를 생성할 수 없음: 다른 네트워크나 VPN, 기기 코드 로그인, 또는 사용자 지정 공급자를 시도하세요. 페이지에서 코드를 Grok Build에 복사하라고 할 때만, “브라우저를 기다리는 중”이 활성인 동안 아래 붙여넣기 필드를 펼치세요.",
+  "account.loginHelpBody": "일반적인 경로: 브라우저에서 로그인을 마치면 GrokCLI이 성공을 자동으로 감지합니다. Access denied / 코드를 생성할 수 없음: 다른 네트워크나 VPN, 기기 코드 로그인, 또는 사용자 지정 공급자를 시도하세요. 페이지에서 코드를 Grok Build에 복사하라고 할 때만, “브라우저를 기다리는 중”이 활성인 동안 아래 붙여넣기 필드를 펼치세요.",
   "account.loginTryDevice": "대신 기기 코드 사용",
   "account.profiles": "계정",
   "account.profilesHint": "이 기기에 저장된 Grok Build 로그인 간에 전환합니다. 스냅샷은 인증만 저장합니다.",

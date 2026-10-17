@@ -237,7 +237,7 @@ export const ruWorkspace = {
   "changes.workspace.loadError": "Не удалось загрузить состояние git рабочей области",
   "changes.workspace.loadErrorHint": "Проверьте путь проекта и обновите. Изменения инструментов сессии всё равно могут отображаться выше.",
   "changes.workspace.hostOnly": "Состояние git рабочей области доступно только в настольном приложении",
-  "changes.workspace.hostOnlyHint": "Откройте настольный Grok App, чтобы просмотреть изменения рабочей области.",
+  "changes.workspace.hostOnlyHint": "Откройте настольный GrokCLI, чтобы просмотреть изменения рабочей области.",
   "changes.workspace.unavailableHint": "Не удалось прочитать состояние git для этого проекта.",
   "changes.workspace.refresh": "Обновить состояние рабочей области",
   "changes.workspace.branch": "Ветка {branch}",

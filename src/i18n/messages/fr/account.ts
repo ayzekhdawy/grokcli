@@ -109,7 +109,7 @@ export const frAccount = {
   "account.loginUnreachableHint": "Si votre CLI grok est déjà connectée, passez le mode de données de session sur partagé (~/.grok) pour la réutiliser. Sur un réseau restreint, lancez avec un proxy.",
   "account.loginOk": "Connecté",
   "account.loginHelpTitle": "Conseils de connexion",
-  "account.loginHelpBody": "Chemin normal : terminez la connexion dans le navigateur ; Grok App détecte le succès automatiquement. Si Accès refusé / impossible de générer un code : essayez un autre réseau ou VPN, la connexion par code d’appareil, ou un fournisseur personnalisé. Uniquement si la page vous demande de copier un code dans Grok Build, déployez le champ de collage ci-dessous tant que « En attente du navigateur » est actif.",
+  "account.loginHelpBody": "Chemin normal : terminez la connexion dans le navigateur ; GrokCLI détecte le succès automatiquement. Si Accès refusé / impossible de générer un code : essayez un autre réseau ou VPN, la connexion par code d’appareil, ou un fournisseur personnalisé. Uniquement si la page vous demande de copier un code dans Grok Build, déployez le champ de collage ci-dessous tant que « En attente du navigateur » est actif.",
   "account.loginTryDevice": "Essayer plutôt le code d’appareil",
   "account.profiles": "Comptes",
   "account.profilesHint": "Basculez entre les connexions Grok Build enregistrées sur cet appareil. Les instantanés stockent uniquement l’authentification.",

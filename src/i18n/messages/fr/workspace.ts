@@ -237,7 +237,7 @@ export const frWorkspace = {
   "changes.workspace.loadError": "Impossible de charger l’état git de l’espace de travail",
   "changes.workspace.loadErrorHint": "Vérifiez le chemin du projet et actualisez. Les modifications d’outils de session apparaissent encore ci-dessus lorsqu’elles existent.",
   "changes.workspace.hostOnly": "L’état git de l’espace de travail nécessite l’application de bureau",
-  "changes.workspace.hostOnlyHint": "Ouvrez Grok App bureau pour inspecter les changements de l’espace de travail.",
+  "changes.workspace.hostOnlyHint": "Ouvrez GrokCLI bureau pour inspecter les changements de l’espace de travail.",
   "changes.workspace.unavailableHint": "L’état git n’a pas pu être lu pour ce projet.",
   "changes.workspace.refresh": "Actualiser l’état de l’espace de travail",
   "changes.workspace.branch": "Sur {branch}",

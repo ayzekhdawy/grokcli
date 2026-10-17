@@ -187,7 +187,7 @@ export const esSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI anterior a {min} — la clave puede ignorarse (fallo suave).",
   "settings.lspTools.banner.hostOnly": "Se requiere el host de escritorio.",
   "settings.lspTools.banner.softRespawn": "Guardar escribe config.toml y reinicia de forma suave el agente para recoger la opción.",
-  "settings.lspTools.banner.noAppLsp": "Grok App no ejecuta servidores de lenguaje por sí misma.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI no ejecuta servidores de lenguaje por sí misma.",
   "settings.lspTools.banner.agentToolsOnly": "Solo herramientas del agente CLI cuando está activado y hay servidores configurados.",
   "settings.lspTools.banner.noDiagnostics": "La App aún no muestra diagnósticos en vivo.",
   "settings.lspTools.refresh": "Actualizar",

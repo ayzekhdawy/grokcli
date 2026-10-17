@@ -352,7 +352,7 @@ export const ukDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Простий інвентар вмісту архіву для отримувача.",
   "reliability.supportZip.emptyHostOnly": "Архів підтримки потребує настільного застосунку",
-  "reliability.supportZip.emptyHostOnlyHint": "Експорт виконується лише на Host Tauri — відкрийте Grok App на робочому столі, щоб зібрати відредагований архів підтримки.",
+  "reliability.supportZip.emptyHostOnlyHint": "Експорт виконується лише на Host Tauri — відкрийте GrokCLI на робочому столі, щоб зібрати відредагований архів підтримки.",
   "reliability.supportZip.failHostOnly": "Архів підтримки потребує настільного застосунку (недоступно в браузері)",
   "reliability.supportZip.failCancel": "Архів підтримки скасовано",
   "reliability.supportZip.failIo": "Не вдалося записати архів підтримки (диск або дозвіл)",

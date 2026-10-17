@@ -237,7 +237,7 @@ export const filWorkspace = {
   "changes.workspace.loadError": "Hindi ma-load ang git status ng workspace",
   "changes.workspace.loadErrorHint": "Tingnan ang path ng proyekto at subukang i-refresh. Lalabas pa rin sa itaas ang mga edit ng tool ng session kapag meron.",
   "changes.workspace.hostOnly": "Kailangan ng desktop app ang git status ng workspace",
-  "changes.workspace.hostOnlyHint": "Buksan ang desktop na Grok App para suriin ang mga pagbabago sa workspace.",
+  "changes.workspace.hostOnlyHint": "Buksan ang desktop na GrokCLI para suriin ang mga pagbabago sa workspace.",
   "changes.workspace.unavailableHint": "Hindi mabasa ang git status para sa proyektong ito.",
   "changes.workspace.refresh": "I-refresh ang status ng workspace",
   "changes.workspace.branch": "Sa {branch}",

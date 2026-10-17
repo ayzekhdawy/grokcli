@@ -109,7 +109,7 @@ export const deAccount = {
   "account.loginUnreachableHint": "Wenn deine grok CLI bereits angemeldet ist, Sitzungsdatenmodus auf shared (~/.grok) stellen, um sie wiederzuverwenden. In eingeschränkten Netzen mit Proxy starten.",
   "account.loginOk": "Angemeldet",
   "account.loginHelpTitle": "Login-Tipps",
-  "account.loginHelpBody": "Normalweg: Anmeldung im Browser abschließen; Grok App erkennt den Erfolg automatisch. Bei Zugriff verweigert / Code nicht erzeugbar: anderes Netz oder VPN, Gerätecode-Login oder Custom-Anbieter. Nur wenn die Seite bittet, einen Code in Grok Build einzufügen, das Einfügefeld unten aufklappen, solange „Warten auf Browser“ aktiv ist.",
+  "account.loginHelpBody": "Normalweg: Anmeldung im Browser abschließen; GrokCLI erkennt den Erfolg automatisch. Bei Zugriff verweigert / Code nicht erzeugbar: anderes Netz oder VPN, Gerätecode-Login oder Custom-Anbieter. Nur wenn die Seite bittet, einen Code in Grok Build einzufügen, das Einfügefeld unten aufklappen, solange „Warten auf Browser“ aktiv ist.",
   "account.loginTryDevice": "Stattdessen Gerätecode versuchen",
   "account.profiles": "Konten",
   "account.profilesHint": "Zwischen gespeicherten Grok-Build-Logins auf diesem Gerät wechseln. Snapshots speichern nur Auth.",

@@ -109,7 +109,7 @@ export const itAccount = {
   "account.loginUnreachableHint": "Se la CLI grok è già autenticata, passa la modalità dati sessione a condivisa (~/.grok) per riutilizzarla. Su reti con restrizioni, avvia con un proxy.",
   "account.loginOk": "Accesso effettuato",
   "account.loginHelpTitle": "Suggerimenti per l’accesso",
-  "account.loginHelpBody": "Percorso normale: completa l’accesso nel browser; Grok App rileva il successo automaticamente. Se Access denied / impossibile generare un codice: prova un’altra rete o VPN, l’accesso con codice dispositivo, oppure un provider personalizzato. Solo se la pagina chiede di copiare un codice in Grok Build, espandi il campo di incolla qui sotto mentre «In attesa del browser» è ancora attivo.",
+  "account.loginHelpBody": "Percorso normale: completa l’accesso nel browser; GrokCLI rileva il successo automaticamente. Se Access denied / impossibile generare un codice: prova un’altra rete o VPN, l’accesso con codice dispositivo, oppure un provider personalizzato. Solo se la pagina chiede di copiare un codice in Grok Build, espandi il campo di incolla qui sotto mentre «In attesa del browser» è ancora attivo.",
   "account.loginTryDevice": "Prova invece il codice dispositivo",
   "account.profiles": "Account",
   "account.profilesHint": "Passa tra gli accessi Grok Build salvati su questo dispositivo. Gli snapshot memorizzano solo l’autenticazione.",

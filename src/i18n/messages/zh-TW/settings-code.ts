@@ -187,7 +187,7 @@ export const zhTWSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI 低於 {min} — 可能忽略該鍵（soft-fail）。",
   "settings.lspTools.banner.hostOnly": "需要桌面主機。",
   "settings.lspTools.banner.softRespawn": "儲存會寫入 config.toml 並 soft-respawn agent，以便生效該旗標。",
-  "settings.lspTools.banner.noAppLsp": "Grok App 本身不執行語言伺服器。",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI 本身不執行語言伺服器。",
   "settings.lspTools.banner.agentToolsOnly": "僅在啟用且已設定伺服器時提供 CLI agent 工具。",
   "settings.lspTools.banner.noDiagnostics": "應用尚未顯示即時診斷。",
   "settings.lspTools.refresh": "重新整理",

@@ -187,7 +187,7 @@ export const jaSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI が {min} 未満 — このキーは無視されることがあります（soft-fail）。",
   "settings.lspTools.banner.hostOnly": "デスクトップホストが必要です。",
   "settings.lspTools.banner.softRespawn": "保存すると config.toml に書き込み、フラグを反映するため agent を soft-respawn します。",
-  "settings.lspTools.banner.noAppLsp": "Grok App 自体は言語サーバーを実行しません。",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI 自体は言語サーバーを実行しません。",
   "settings.lspTools.banner.agentToolsOnly": "有効かつサーバー設定済みのときのみ CLI agent ツールです。",
   "settings.lspTools.banner.noDiagnostics": "アプリはまだライブ診断を表示しません。",
   "settings.lspTools.refresh": "更新",

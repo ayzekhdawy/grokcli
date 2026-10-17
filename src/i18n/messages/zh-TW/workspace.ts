@@ -237,7 +237,7 @@ export const zhTWWorkspace = {
   "changes.workspace.loadError": "無法載入工作區 git 狀態",
   "changes.workspace.loadErrorHint": "請檢查專案路徑後再重新整理。若工作階段中有工具編輯，仍會顯示於上方。",
   "changes.workspace.hostOnly": "工作區 git 狀態需要桌面應用",
-  "changes.workspace.hostOnlyHint": "請開啟 Grok App 桌面版以查看工作區變更。",
+  "changes.workspace.hostOnlyHint": "請開啟 GrokCLI 桌面版以查看工作區變更。",
   "changes.workspace.unavailableHint": "無法讀取此專案的 git 狀態。",
   "changes.workspace.refresh": "重新整理工作區狀態",
   "changes.workspace.branch": "分支 {branch}",

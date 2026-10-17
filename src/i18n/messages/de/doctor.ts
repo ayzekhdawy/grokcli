@@ -352,7 +352,7 @@ export const deDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Klartext-Inventar der Zip-Inhalte für den Empfänger.",
   "reliability.supportZip.emptyHostOnly": "Support-Zip braucht die Desktop-App",
-  "reliability.supportZip.emptyHostOnlyHint": "Export läuft nur auf dem Tauri-Host — Grok App Desktop öffnen, um ein redigiertes Support-Zip zu bauen.",
+  "reliability.supportZip.emptyHostOnlyHint": "Export läuft nur auf dem Tauri-Host — GrokCLI Desktop öffnen, um ein redigiertes Support-Zip zu bauen.",
   "reliability.supportZip.failHostOnly": "Support-Zip braucht die Desktop-App (nicht im Browser verfügbar)",
   "reliability.supportZip.failCancel": "Support-Zip abgebrochen",
   "reliability.supportZip.failIo": "Support-Zip konnte nicht geschrieben werden (Festplatte oder Berechtigung)",

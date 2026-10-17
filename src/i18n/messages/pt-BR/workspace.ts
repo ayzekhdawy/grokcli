@@ -237,7 +237,7 @@ export const ptBRWorkspace = {
   "changes.workspace.loadError": "Não foi possível carregar o status git do espaço de trabalho",
   "changes.workspace.loadErrorHint": "Verifique o caminho do projeto e tente atualizar. Edições de ferramentas da sessão ainda aparecem acima, quando presentes.",
   "changes.workspace.hostOnly": "O status git do espaço de trabalho precisa do app de desktop",
-  "changes.workspace.hostOnlyHint": "Abra o Grok App desktop para inspecionar as mudanças do espaço de trabalho.",
+  "changes.workspace.hostOnlyHint": "Abra o GrokCLI desktop para inspecionar as mudanças do espaço de trabalho.",
   "changes.workspace.unavailableHint": "Não foi possível ler o status git deste projeto.",
   "changes.workspace.refresh": "Atualizar status do espaço de trabalho",
   "changes.workspace.branch": "Em {branch}",

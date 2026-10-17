@@ -352,7 +352,7 @@ export const zhDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "给接收方的压缩包内容说明。",
   "reliability.supportZip.emptyHostOnly": "支持包需要桌面应用",
-  "reliability.supportZip.emptyHostOnlyHint": "导出仅在 Tauri 主机上运行 — 请在桌面版 Grok App 中生成脱敏支持包。",
+  "reliability.supportZip.emptyHostOnlyHint": "导出仅在 Tauri 主机上运行 — 请在桌面版 GrokCLI 中生成脱敏支持包。",
   "reliability.supportZip.failHostOnly": "支持包需要桌面应用（浏览器中不可用）",
   "reliability.supportZip.failCancel": "已取消导出支持包",
   "reliability.supportZip.failIo": "无法写入支持包（磁盘或权限）",

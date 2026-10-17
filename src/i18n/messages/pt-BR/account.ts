@@ -109,7 +109,7 @@ export const ptBRAccount = {
   "account.loginUnreachableHint": "Se a CLI grok já estiver autenticada, mude o modo de dados da sessão para compartilhado (~/.grok) para reutilizá-la. Em redes restritas, inicie com um proxy.",
   "account.loginOk": "Conectado",
   "account.loginHelpTitle": "Dicas de login",
-  "account.loginHelpBody": "Caminho normal: conclua o login no navegador; o Grok App detecta o sucesso automaticamente. Se aparecer Access denied / não for possível gerar um código: tente outra rede ou VPN, login com código do dispositivo, ou um provedor personalizado. Só se a página pedir para copiar um código para o Grok Build, expanda o campo de colar abaixo enquanto “Aguardando o navegador” ainda estiver ativo.",
+  "account.loginHelpBody": "Caminho normal: conclua o login no navegador; o GrokCLI detecta o sucesso automaticamente. Se aparecer Access denied / não for possível gerar um código: tente outra rede ou VPN, login com código do dispositivo, ou um provedor personalizado. Só se a página pedir para copiar um código para o Grok Build, expanda o campo de colar abaixo enquanto “Aguardando o navegador” ainda estiver ativo.",
   "account.loginTryDevice": "Tentar código do dispositivo",
   "account.profiles": "Contas",
   "account.profilesHint": "Alterne entre logins do Grok Build salvos neste dispositivo. Os snapshots guardam só a autenticação.",

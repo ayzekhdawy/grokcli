@@ -187,7 +187,7 @@ export const itSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI più vecchia di {min} — la chiave potrebbe essere ignorata (soft-fail).",
   "settings.lspTools.banner.hostOnly": "Host desktop richiesto.",
   "settings.lspTools.banner.softRespawn": "Il salvataggio scrive config.toml e fa un soft-respawn dell’agente così il flag viene raccolto.",
-  "settings.lspTools.banner.noAppLsp": "Grok App non esegue language server da sola.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI non esegue language server da sola.",
   "settings.lspTools.banner.agentToolsOnly": "Solo strumenti dell’agente CLI quando abilitati e i server sono configurati.",
   "settings.lspTools.banner.noDiagnostics": "L’app non mostra ancora diagnostica live.",
   "settings.lspTools.refresh": "Aggiorna",

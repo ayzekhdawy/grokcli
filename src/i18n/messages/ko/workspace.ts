@@ -237,7 +237,7 @@ export const koWorkspace = {
   "changes.workspace.loadError": "작업 공간 git 상태를 불러오지 못했습니다",
   "changes.workspace.loadErrorHint": "프로젝트 경로를 확인한 뒤 새로고침하세요. 세션 도구 편집은 있으면 위에 계속 나타납니다.",
   "changes.workspace.hostOnly": "작업 공간 git 상태는 데스크톱 앱이 필요합니다",
-  "changes.workspace.hostOnlyHint": "작업 공간 변경을 보려면 Grok App 데스크톱을 여세요.",
+  "changes.workspace.hostOnlyHint": "작업 공간 변경을 보려면 GrokCLI 데스크톱을 여세요.",
   "changes.workspace.unavailableHint": "이 프로젝트의 git 상태를 읽지 못했습니다.",
   "changes.workspace.refresh": "작업 공간 상태 새로고침",
   "changes.workspace.branch": "{branch}에 있음",

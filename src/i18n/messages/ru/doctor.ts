@@ -352,7 +352,7 @@ export const ruDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Простой список содержимого zip для получателя.",
   "reliability.supportZip.emptyHostOnly": "Zip поддержки нужен в настольном приложении",
-  "reliability.supportZip.emptyHostOnlyHint": "Экспорт выполняется только на Tauri Host — откройте Grok App на компьютере, чтобы собрать zip поддержки без секретов.",
+  "reliability.supportZip.emptyHostOnlyHint": "Экспорт выполняется только на Tauri Host — откройте GrokCLI на компьютере, чтобы собрать zip поддержки без секретов.",
   "reliability.supportZip.failHostOnly": "Zip поддержки нужен в настольном приложении (в браузере недоступен)",
   "reliability.supportZip.failCancel": "Экспорт zip поддержки отменён",
   "reliability.supportZip.failIo": "Не удалось записать zip поддержки (диск или права)",

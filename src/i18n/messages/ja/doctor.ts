@@ -352,7 +352,7 @@ export const jaDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "受信者向けの zip 内容のプレーンな一覧です。",
   "reliability.supportZip.emptyHostOnly": "サポート zip にはデスクトップアプリが必要です",
-  "reliability.supportZip.emptyHostOnlyHint": "書き出しは Tauri ホストでのみ実行されます — 秘匿済みサポート zip を作るにはデスクトップで Grok App を開いてください。",
+  "reliability.supportZip.emptyHostOnlyHint": "書き出しは Tauri ホストでのみ実行されます — 秘匿済みサポート zip を作るにはデスクトップで GrokCLI を開いてください。",
   "reliability.supportZip.failHostOnly": "サポート zip にはデスクトップアプリが必要です（ブラウザでは利用できません）",
   "reliability.supportZip.failCancel": "サポート zip をキャンセルしました",
   "reliability.supportZip.failIo": "サポート zip を書き込めませんでした（ディスクまたは権限）",

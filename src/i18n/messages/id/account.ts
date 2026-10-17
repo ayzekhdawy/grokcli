@@ -109,7 +109,7 @@ export const idAccount = {
   "account.loginUnreachableHint": "Jika grok CLI Anda sudah masuk, alihkan Mode data sesi ke bersama (~/.grok) untuk menggunakannya kembali. Pada jaringan terbatas, jalankan dengan proksi.",
   "account.loginOk": "Sudah masuk",
   "account.loginHelpTitle": "Tips masuk",
-  "account.loginHelpBody": "Jalur normal: selesaikan masuk di peramban; Grok App mendeteksi keberhasilan otomatis. Jika Akses ditolak / tidak dapat menghasilkan kode: coba jaringan atau VPN lain, masuk kode perangkat, atau penyedia kustom. Hanya jika halaman meminta Anda menyalin kode ke Grok Build, bentangkan kolom tempel di bawah saat “Menunggu peramban” masih aktif.",
+  "account.loginHelpBody": "Jalur normal: selesaikan masuk di peramban; GrokCLI mendeteksi keberhasilan otomatis. Jika Akses ditolak / tidak dapat menghasilkan kode: coba jaringan atau VPN lain, masuk kode perangkat, atau penyedia kustom. Hanya jika halaman meminta Anda menyalin kode ke Grok Build, bentangkan kolom tempel di bawah saat “Menunggu peramban” masih aktif.",
   "account.loginTryDevice": "Coba kode perangkat",
   "account.profiles": "Akun",
   "account.profilesHint": "Beralih antara login Grok Build yang disimpan di perangkat ini. Snapshot hanya menyimpan autentikasi.",

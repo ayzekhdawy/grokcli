@@ -187,7 +187,7 @@ export const taSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI {min} ஐ விட பழையது — விசை புறக்கணிக்கப்படலாம் (மென்மையான தோல்வி).",
   "settings.lspTools.banner.hostOnly": "டெஸ்க்டாப் ஹோஸ்ட் தேவை.",
   "settings.lspTools.banner.softRespawn": "சேமித்தல் config.toml ஐ எழுதுகிறது மற்றும் முகவரை மென்மையாக மாற்றுகிறது, அதனால் கொடி எடுக்கப்படும்.",
-  "settings.lspTools.banner.noAppLsp": "Grok App ஆனது மொழி சேவையகங்களை இயக்காது.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI ஆனது மொழி சேவையகங்களை இயக்காது.",
   "settings.lspTools.banner.agentToolsOnly": "CLI முகவர் கருவிகள் இயக்கப்பட்டிருக்கும் போது மற்றும் சேவையகங்கள் உள்ளமைக்கப்படும் போது மட்டுமே.",
   "settings.lspTools.banner.noDiagnostics": "செயலி இன்னும் நேரலை கண்டறிதல்களைக் காட்டவில்லை.",
   "settings.lspTools.refresh": "புதுப்பி",

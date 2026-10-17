@@ -50,7 +50,7 @@ export const itSidebar = {
   "sidebar.archiveSelectedTitle": "Archivia chat",
   "sidebar.restoreSelectedTitle": "Ripristina chat",
   "sidebar.archiveSelectedConfirm": "Archiviare {n} chat? Potrai ripristinarle in Impostazioni → Archiviate.",
-  "sidebar.archiveCliHint": "Nasconde la chat solo in Grok App. L’elenco CLI del terminale la mostra finché non la elimini.",
+  "sidebar.archiveCliHint": "Nasconde la chat solo in GrokCLI. L’elenco CLI del terminale la mostra finché non la elimini.",
   "sidebar.restoreSelectedConfirm": "Ripristinare {n} chat nella barra laterale?",
   "sidebar.archivedToast": "{n} chat archiviate",
   "sidebar.restoredToast": "{n} chat ripristinate",

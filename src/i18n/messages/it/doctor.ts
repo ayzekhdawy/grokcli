@@ -352,7 +352,7 @@ export const itDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Inventario in testo semplice dei contenuti dello zip per il destinatario.",
   "reliability.supportZip.emptyHostOnly": "Lo zip di supporto richiede l’app desktop",
-  "reliability.supportZip.emptyHostOnlyHint": "L’esportazione gira solo sull’host Tauri — apri Grok App sul desktop per creare uno zip di supporto oscurato.",
+  "reliability.supportZip.emptyHostOnlyHint": "L’esportazione gira solo sull’host Tauri — apri GrokCLI sul desktop per creare uno zip di supporto oscurato.",
   "reliability.supportZip.failHostOnly": "Lo zip di supporto richiede l’app desktop (non disponibile nel browser)",
   "reliability.supportZip.failCancel": "Zip di supporto annullato",
   "reliability.supportZip.failIo": "Impossibile scrivere lo zip di supporto (disco o permesso)",

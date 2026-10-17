@@ -109,7 +109,7 @@ export const esAccount = {
   "account.loginUnreachableHint": "Si tu grok CLI ya ha iniciado sesión, cambia el modo de datos de sesión a compartido (~/.grok) para reutilizarla. En redes restringidas, arranca con un proxy.",
   "account.loginOk": "Sesión iniciada",
   "account.loginHelpTitle": "Consejos de inicio de sesión",
-  "account.loginHelpBody": "Vía normal: termina el inicio de sesión en el navegador; Grok App detecta el éxito automáticamente. Si Acceso denegado / no se puede generar un código: prueba otra red o VPN, inicio con código de dispositivo, o un proveedor personalizado. Solo si la página te pide copiar un código en Grok Build, expande el campo de pegado de abajo mientras «Esperando el navegador» siga activo.",
+  "account.loginHelpBody": "Vía normal: termina el inicio de sesión en el navegador; GrokCLI detecta el éxito automáticamente. Si Acceso denegado / no se puede generar un código: prueba otra red o VPN, inicio con código de dispositivo, o un proveedor personalizado. Solo si la página te pide copiar un código en Grok Build, expande el campo de pegado de abajo mientras «Esperando el navegador» siga activo.",
   "account.loginTryDevice": "Probar código de dispositivo",
   "account.profiles": "Cuentas",
   "account.profilesHint": "Cambia entre inicios de sesión de Grok Build guardados en este dispositivo. Las instantáneas solo guardan la autenticación.",

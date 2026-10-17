@@ -237,7 +237,7 @@ export const zhWorkspace = {
   "changes.workspace.loadError": "无法加载工作区 git 状态",
   "changes.workspace.loadErrorHint": "请检查项目路径后重试刷新。若会话中有工具编辑，仍会显示在上方。",
   "changes.workspace.hostOnly": "工作区 git 状态需要桌面应用",
-  "changes.workspace.hostOnlyHint": "请打开 Grok App 桌面端以查看工作区变更。",
+  "changes.workspace.hostOnlyHint": "请打开 GrokCLI 桌面端以查看工作区变更。",
   "changes.workspace.unavailableHint": "无法读取此项目的 git 状态。",
   "changes.workspace.refresh": "刷新工作区状态",
   "changes.workspace.branch": "分支 {branch}",

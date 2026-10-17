@@ -109,7 +109,7 @@ export const trAccount = {
   "account.loginUnreachableHint": "grok CLI'de zaten giriş yaptıysanız, yeniden kullanmak için Oturum veri modunu paylaşımlı (~/.grok) yapın. Kısıtlı ağlarda vekil sunucuyla başlatın.",
   "account.loginOk": "Giriş yapıldı",
   "account.loginHelpTitle": "Giriş ipuçları",
-  "account.loginHelpBody": "Normal yol: girişi tarayıcıda tamamlayın; Grok App başarıyı kendisi algılar. Erişim reddedildi / kod oluşturulamıyor hatasında: başka bir ağ ya da VPN, Cihaz kodu girişi veya özel bir sağlayıcı deneyin. Yalnızca sayfa sizden Grok Build'e bir kod kopyalamanızı isterse, “Tarayıcı bekleniyor” hâlâ etkinken aşağıdaki yapıştırma alanını açın.",
+  "account.loginHelpBody": "Normal yol: girişi tarayıcıda tamamlayın; GrokCLI başarıyı kendisi algılar. Erişim reddedildi / kod oluşturulamıyor hatasında: başka bir ağ ya da VPN, Cihaz kodu girişi veya özel bir sağlayıcı deneyin. Yalnızca sayfa sizden Grok Build'e bir kod kopyalamanızı isterse, “Tarayıcı bekleniyor” hâlâ etkinken aşağıdaki yapıştırma alanını açın.",
   "account.loginTryDevice": "Bunun yerine cihaz kodunu dene",
   "account.profiles": "Hesaplar",
   "account.profilesHint": "Bu cihazdaki kayıtlı Grok Build girişleri arasında geçiş yapın. Anlık kopyalar yalnızca kimlik bilgisini saklar.",

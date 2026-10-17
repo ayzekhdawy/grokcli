@@ -352,7 +352,7 @@ export const zhTWDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "給接收方的壓縮檔內容說明。",
   "reliability.supportZip.emptyHostOnly": "支援包需要桌面應用程式",
-  "reliability.supportZip.emptyHostOnlyHint": "匯出僅在 Tauri 主機上執行 — 請在桌面版 Grok App 中產生去敏支援包。",
+  "reliability.supportZip.emptyHostOnlyHint": "匯出僅在 Tauri 主機上執行 — 請在桌面版 GrokCLI 中產生去敏支援包。",
   "reliability.supportZip.failHostOnly": "支援包需要桌面應用程式（瀏覽器中不可用）",
   "reliability.supportZip.failCancel": "已取消匯出支援包",
   "reliability.supportZip.failIo": "無法寫入支援包（磁碟或權限）",

@@ -187,7 +187,7 @@ export const ptBRSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI mais antiga que {min} — a chave pode ser ignorada (falha suave).",
   "settings.lspTools.banner.hostOnly": "Host de desktop obrigatório.",
   "settings.lspTools.banner.softRespawn": "Salvar grava o config.toml e faz respawn suave do agente para a flag ser captada.",
-  "settings.lspTools.banner.noAppLsp": "O Grok App não executa language servers por conta própria.",
+  "settings.lspTools.banner.noAppLsp": "O GrokCLI não executa language servers por conta própria.",
   "settings.lspTools.banner.agentToolsOnly": "Só ferramentas do agente da CLI quando ativadas e os servidores estão configurados.",
   "settings.lspTools.banner.noDiagnostics": "O App ainda não mostra diagnósticos ao vivo.",
   "settings.lspTools.refresh": "Atualizar",

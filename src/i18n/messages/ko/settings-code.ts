@@ -187,7 +187,7 @@ export const koSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI가 {min}보다 오래됨 — 키가 무시될 수 있습니다(소프트 실패).",
   "settings.lspTools.banner.hostOnly": "데스크톱 호스트가 필요합니다.",
   "settings.lspTools.banner.softRespawn": "저장하면 config.toml을 쓰고 에이전트를 소프트 재시작해 플래그를 적용합니다.",
-  "settings.lspTools.banner.noAppLsp": "Grok App은 언어 서버를 직접 실행하지 않습니다.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI은 언어 서버를 직접 실행하지 않습니다.",
   "settings.lspTools.banner.agentToolsOnly": "켜져 있고 서버가 구성될 때 CLI 에이전트 도구만.",
   "settings.lspTools.banner.noDiagnostics": "앱은 아직 실시간 진단을 보여 주지 않습니다.",
   "settings.lspTools.refresh": "새로고침",

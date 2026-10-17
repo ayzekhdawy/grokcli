@@ -187,7 +187,7 @@ export const frSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI plus ancienne que {min} — la clé peut être ignorée (échec souple).",
   "settings.lspTools.banner.hostOnly": "Hôte de bureau requis.",
   "settings.lspTools.banner.softRespawn": "Enregistrer écrit config.toml et relance souplement l’agent pour que le drapeau soit pris en compte.",
-  "settings.lspTools.banner.noAppLsp": "Grok App n’exécute pas elle-même de serveurs de langage.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI n’exécute pas elle-même de serveurs de langage.",
   "settings.lspTools.banner.agentToolsOnly": "Outils agent CLI uniquement lorsque activés et que des serveurs sont configurés.",
   "settings.lspTools.banner.noDiagnostics": "L’app n’affiche pas encore de diagnostics en direct.",
   "settings.lspTools.refresh": "Actualiser",

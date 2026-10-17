@@ -352,7 +352,7 @@ export const idDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Inventaris polos isi zip untuk penerima.",
   "reliability.supportZip.emptyHostOnly": "Zip dukungan memerlukan aplikasi desktop",
-  "reliability.supportZip.emptyHostOnlyHint": "Ekspor berjalan hanya di host Tauri — buka Grok App di desktop untuk membuat zip dukungan yang disunting.",
+  "reliability.supportZip.emptyHostOnlyHint": "Ekspor berjalan hanya di host Tauri — buka GrokCLI di desktop untuk membuat zip dukungan yang disunting.",
   "reliability.supportZip.failHostOnly": "Zip dukungan memerlukan aplikasi desktop (tidak tersedia di peramban)",
   "reliability.supportZip.failCancel": "Zip dukungan dibatalkan",
   "reliability.supportZip.failIo": "Zip dukungan tidak dapat ditulis (disk atau izin)",

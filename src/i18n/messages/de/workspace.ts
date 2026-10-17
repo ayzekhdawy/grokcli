@@ -237,7 +237,7 @@ export const deWorkspace = {
   "changes.workspace.loadError": "Workspace-Git-Status konnte nicht geladen werden",
   "changes.workspace.loadErrorHint": "Projektpfad prüfen und aktualisieren. Sitzungs-Tool-Edits erscheinen oben, wenn vorhanden.",
   "changes.workspace.hostOnly": "Workspace-Git-Status braucht die Desktop-App",
-  "changes.workspace.hostOnlyHint": "Grok App Desktop öffnen, um Workspace-Änderungen zu prüfen.",
+  "changes.workspace.hostOnlyHint": "GrokCLI Desktop öffnen, um Workspace-Änderungen zu prüfen.",
   "changes.workspace.unavailableHint": "Git-Status für dieses Projekt konnte nicht gelesen werden.",
   "changes.workspace.refresh": "Workspace-Status aktualisieren",
   "changes.workspace.branch": "Auf {branch}",

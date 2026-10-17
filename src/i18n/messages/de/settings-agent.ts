@@ -214,7 +214,7 @@ export const deSettingsAgent = {
   "settings.sessionApi.title": "Session-API",
   "settings.sessionApi.desc": "Lokales Loopback für andere Apps auf diesem Gerät: Grok-App-Chats listen, dann einen per Sitzungs-ID + Prompt fortsetzen. Legt keinen neuen Chat an. Unterbricht keinen laufenden Vorgang. Senden braucht diese App (oder den Tray); Listen kann den Index auf der Festplatte lesen, wenn die App beendet ist.",
   "settings.sessionApi.listening": "Hört auf Loopback",
-  "settings.sessionApi.offline": "Hört nicht — Grok App starten, um Vorgänge anzunehmen",
+  "settings.sessionApi.offline": "Hört nicht — GrokCLI starten, um Vorgänge anzunehmen",
   "settings.sessionApi.url": "URL",
   "settings.sessionApi.tokenFile": "Token-Datei",
   "settings.sessionApi.revealTokenFile": "Token-Datei zeigen",

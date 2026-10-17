@@ -352,7 +352,7 @@ export const enDoctor = {
   "reliability.supportZip.section.readme": "README.txt",
   "reliability.supportZip.section.readmeHint": "Plain inventory of zip contents for the recipient.",
   "reliability.supportZip.emptyHostOnly": "Support zip needs the desktop app",
-  "reliability.supportZip.emptyHostOnlyHint": "Export runs on the Tauri host only — open Grok App on desktop to build a redacted support zip.",
+  "reliability.supportZip.emptyHostOnlyHint": "Export runs on the Tauri host only — open GrokCLI on desktop to build a redacted support zip.",
   "reliability.supportZip.failHostOnly": "Support zip needs the desktop app (not available in browser)",
   "reliability.supportZip.failCancel": "Support zip cancelled",
   "reliability.supportZip.failIo": "Could not write support zip (disk or permission)",

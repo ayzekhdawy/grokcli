@@ -187,7 +187,7 @@ export const ukSettingsCode = {
   "settings.lspTools.banner.cliOld": "CLI старше {min} — клавіша може бути проігнорована (soft-fail).",
   "settings.lspTools.banner.hostOnly": "Потрібен настільний Host.",
   "settings.lspTools.banner.softRespawn": "Збереження записує config.toml та м’яко відновлює агента, щоб прапор було підібрано.",
-  "settings.lspTools.banner.noAppLsp": "Grok App сама не запускає мовні сервери.",
+  "settings.lspTools.banner.noAppLsp": "GrokCLI сама не запускає мовні сервери.",
   "settings.lspTools.banner.agentToolsOnly": "CLI інструменти агента, лише якщо ввімкнено та налаштовано сервери.",
   "settings.lspTools.banner.noDiagnostics": "Застосунок ще не показує поточну діагностику.",
   "settings.lspTools.refresh": "Оновити",
