@@ -13,7 +13,7 @@ pub fn app_data_root() -> PathBuf {
     if let Ok(custom) = std::env::var("GROK_APP_HOME") {
         return PathBuf::from(custom);
     }
-    if let Some(proj) = ProjectDirs::from("com", "grokapp", "grok-app") {
+    if let Some(proj) = ProjectDirs::from("com", "noniux", "grokcli") {
         return proj.data_dir().to_path_buf();
     }
     // Fallback
