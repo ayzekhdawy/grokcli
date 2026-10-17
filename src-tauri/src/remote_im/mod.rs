@@ -254,7 +254,7 @@ pub async fn remote_im_scan_poll(
 }
 
 #[tauri::command]
-pub fn remote_im_list_instances() -> Result<Vec<ChannelInstanceDto>, String> {
+pub async fn remote_im_list_instances() -> Result<Vec<ChannelInstanceDto>, String> {
     Ok(config::list_instances())
 }
 
@@ -284,6 +284,6 @@ pub async fn remote_im_delete_instance(
 }
 
 #[tauri::command]
-pub fn remote_im_doctor() -> Result<serde_json::Value, String> {
+pub async fn remote_im_doctor() -> Result<serde_json::Value, String> {
     Ok(bridge::doctor_report())
 }

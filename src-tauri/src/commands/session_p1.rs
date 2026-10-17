@@ -143,7 +143,7 @@ pub async fn session_rewind_execute(
 /// chat carries that id with a one-shot fork flag so the next connect uses
 /// CLI `--fork-session` semantics (ACP `session/fork` → new agent id).
 #[tauri::command]
-pub fn session_fork(
+pub async fn session_fork(
     source_id: String,
     through_user_prompt_index: Option<u32>,
     title: Option<String>,
@@ -222,7 +222,7 @@ pub async fn session_resolve_plan(
 
 /// Load persisted plan chrome for an app session (P1 resume).
 #[tauri::command]
-pub fn session_plan_chrome_get(
+pub async fn session_plan_chrome_get(
     session_id: String,
 ) -> Result<Option<crate::plan_chrome::PlanChromeStored>, String> {
     Ok(crate::plan_chrome::load_plan_chrome_for_ui(&session_id))
@@ -230,7 +230,7 @@ pub fn session_plan_chrome_get(
 
 /// Save plan chrome from the UI (hard dismiss / soft hide).
 #[tauri::command]
-pub fn session_plan_chrome_set(
+pub async fn session_plan_chrome_set(
     session_id: String,
     chrome: crate::plan_chrome::PlanChromeStored,
 ) -> Result<(), String> {
@@ -239,7 +239,7 @@ pub fn session_plan_chrome_set(
 
 /// Read agent-side plan_mode.json + plan.md for the app session (resume UI).
 #[tauri::command]
-pub fn session_agent_plan_snapshot(
+pub async fn session_agent_plan_snapshot(
     session_id: String,
 ) -> Result<crate::plan_chrome::AgentPlanSnapshot, String> {
     Ok(crate::plan_chrome::load_agent_plan_snapshot(&session_id))

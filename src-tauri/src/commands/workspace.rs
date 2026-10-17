@@ -4,22 +4,22 @@
 use crate::workspace_store::{self, root_snapshot, WorkspaceRecord, WorkspaceRoot};
 
 #[tauri::command]
-pub fn workspaces_list() -> Result<Vec<WorkspaceRecord>, String> {
+pub async fn workspaces_list() -> Result<Vec<WorkspaceRecord>, String> {
     Ok(workspace_store::list_workspaces())
 }
 
 #[tauri::command]
-pub fn workspaces_for_project(project_id: String) -> Result<Vec<WorkspaceRecord>, String> {
+pub async fn workspaces_for_project(project_id: String) -> Result<Vec<WorkspaceRecord>, String> {
     Ok(workspace_store::workspaces_for_project(&project_id))
 }
 
 #[tauri::command]
-pub fn workspace_get(id: String) -> Result<Option<WorkspaceRecord>, String> {
+pub async fn workspace_get(id: String) -> Result<Option<WorkspaceRecord>, String> {
     Ok(workspace_store::get_workspace(&id))
 }
 
 #[tauri::command]
-pub fn workspace_upsert(
+pub async fn workspace_upsert(
     id: Option<String>,
     name: String,
     primary_project_id: String,
@@ -29,12 +29,12 @@ pub fn workspace_upsert(
 }
 
 #[tauri::command]
-pub fn workspace_delete(id: String) -> Result<(), String> {
+pub async fn workspace_delete(id: String) -> Result<(), String> {
     workspace_store::delete_workspace(&id)
 }
 
 #[tauri::command]
-pub fn workspace_validate_root(path: String) -> Result<WorkspaceRoot, String> {
+pub async fn workspace_validate_root(path: String) -> Result<WorkspaceRoot, String> {
     let (canon, path_ok) = workspace_store::canonicalize_workspace_root(&path)?;
     Ok(WorkspaceRoot {
         path: canon,
@@ -46,7 +46,7 @@ pub fn workspace_validate_root(path: String) -> Result<WorkspaceRoot, String> {
 
 /// Refresh capability plans for all workspaces (Doctor / settings).
 #[tauri::command]
-pub fn workspaces_diagnose() -> Result<Vec<WorkspaceRecord>, String> {
+pub async fn workspaces_diagnose() -> Result<Vec<WorkspaceRecord>, String> {
     workspace_store::refresh_all_capabilities()
 }
 

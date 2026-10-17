@@ -1264,14 +1264,14 @@ pub async fn session_api_reveal_token_file() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn session_api_install_cli(app: AppHandle) -> Result<SessionApiStatus, String> {
+pub async fn session_api_install_cli(app: AppHandle) -> Result<SessionApiStatus, String> {
     let desired = desired_cli_target()?;
     install_cli_link_at(&cli_link_path(), &desired)?;
     Ok(status(Some(&app)))
 }
 
 #[tauri::command]
-pub fn session_api_remove_cli(app: AppHandle) -> Result<SessionApiStatus, String> {
+pub async fn session_api_remove_cli(app: AppHandle) -> Result<SessionApiStatus, String> {
     remove_cli_link_at(&cli_link_path())?;
     Ok(status(Some(&app)))
 }
