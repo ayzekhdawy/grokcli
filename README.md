@@ -1,21 +1,29 @@
 # GrokCLI
 
-> **Fork notice:** GrokCLI is a fork of [RongleCat/grok-app](https://github.com/RongleCat/grok-app) (MIT) with stability fixes:
-> - `session/load` sends `_meta.noReplay` so reopening very large chats skips the transcript replay (opt out: `GROK_APP_FULL_REPLAY=1`)
-> - separate 150s session/load timeout and wider connect/handshake budgets
-> - own identifier/data dir (`com.noniux.grokcli`) so it runs beside the original app
+**Fast, stable Windows desktop workbench for the Grok CLI.**
+**Grok CLI için hızlı ve kararlı Windows masaüstü çalışma alanı.**
+
+🌐 https://grok.noniux.com · ⬇️ [Releases](https://github.com/ayzekhdawy/grokcli/releases)
+
+> **Fork notice:** GrokCLI is a fork of [RongleCat/grok-app](https://github.com/RongleCat/grok-app) (MIT). Original copyright and the MIT license are retained (see [LICENSE](LICENSE)).
 >
-> Original copyright and MIT license retained (see LICENSE).
+> Changes in this fork:
+> - `session/load` sends `_meta.noReplay` so reopening very large chats skips the transcript replay (opt out: `GROK_APP_FULL_REPLAY=1`)
+> - separate 150s session/load timeout, wider connect/handshake budgets, stale connect-claim takeover
+> - Windows: no CSS caption drag regions (WebView2 input stalls); pet windows created off the main thread
+> - full Turkish (tr) localization
+> - desktop pet quick bar (Alt+Win+P), pet size slider
+> - own identifier/data dir (`com.noniux.grokcli`) so it runs beside the original app
 
 <p align="center">
   <img src="assets/logo.png" alt="Grok App Logo" width="128" height="128" />
 </p>
 
-<h1 align="center">Grok App</h1>
+<h1 align="center">GrokCLI</h1>
 
 <p align="center"><strong>Modern Desktop Workbench for Local Grok Build CLI</strong></p>
 <p align="center"><em>Multi-Project Spaces · Real-time Agent Streaming · Integrated File & Code Loop · Omnichannel Remote IM · Desktop Companion & Personalization</em></p>
-<p align="center"><a href="https://grok-app.com">https://grok-app.com</a></p>
+<p align="center"><a href="https://grok.noniux.com">https://grok.noniux.com</a></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
