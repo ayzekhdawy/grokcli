@@ -19,7 +19,7 @@ describe("tauri dev identifier overlay", () => {
       identifier: string;
       productName?: string;
     };
-    expect(base.identifier).toBe("com.grokapp.desktop");
+    expect(base.identifier).toBe("com.noniux.grokcli");
     expect(dev.identifier).toBe("com.grokapp.desktop.dev");
     expect(dev.productName).toBe("Grok Dev");
   });

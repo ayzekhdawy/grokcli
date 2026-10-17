@@ -112,7 +112,7 @@ describe("window chrome", () => {
     expect(body).toMatch(/ensure_main_window_shell_integration/);
     expect(body).toMatch(/set_main_window_skip_taskbar/);
     const conf = JSON.parse(readFileSync(CONF_PATH, "utf8")) as { identifier?: string };
-    expect(conf.identifier).toBe("com.grokapp.desktop");
+    expect(conf.identifier).toBe("com.noniux.grokcli");
     expect(body).toMatch(/pub fn set_process_app_user_model_id\(id: &str\)/);
   });
 
@@ -130,12 +130,12 @@ describe("window chrome", () => {
     expect(inner).toContain("ActivationPolicy::Regular");
   });
 
-  it("base product identity is Grok", () => {
+  it("base product identity is GrokCLI (fork)", () => {
     const conf = JSON.parse(readFileSync(CONF_PATH, "utf8")) as {
       productName?: string;
       app: { windows: Array<{ title?: string }> };
     };
-    expect(conf.productName).toBe("Grok");
+    expect(conf.productName).toBe("GrokCLI");
     expect(conf.app.windows[0]!.title).toBe("Grok");
   });
 
