@@ -1,6 +1,7 @@
 /**
  * Settings → about section (consumes SettingsModel context).
  */
+import { STORE_BUILD } from "@/hooks/useUpdater";
 import { useSettingsModel } from "@/providers/SettingsModelContext";
 
 import { IconHelp, IconInfo, IconSparkles } from "@/components/icons";
@@ -34,7 +35,7 @@ export function AboutSection() {
             <div className="settings-row__desc">{versionFooter}</div>
           </div>
         </div>
-        <AboutUpdateRow t={t} />
+        {STORE_BUILD ? null : <AboutUpdateRow t={t} />}
         <div
           className={
             "settings-row settings-row--stack" +

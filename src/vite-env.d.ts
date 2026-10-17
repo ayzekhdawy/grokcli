@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_GROK_DISPLAY_VERSION?: string;
   readonly VITE_GROK_RELEASES_URL?: string;
+  /** "1" = Microsoft Store package: hide in-app update checks. */
+  readonly VITE_GROK_STORE_BUILD?: string;
 }
 
 declare module "plyr" {

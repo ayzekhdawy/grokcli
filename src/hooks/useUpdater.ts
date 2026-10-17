@@ -64,7 +64,13 @@ const BACKGROUND_BLOCKED_STATES = new Set<UpdateStatus["state"]>([
 /** Override via VITE_GROK_RELEASES_URL when the repo path differs. */
 const GITHUB_RELEASES_URL =
   (import.meta.env.VITE_GROK_RELEASES_URL as string | undefined) ||
-  "https://github.com/RongleCat/grok-app/releases/latest";
+  "https://github.com/ayzekhdawy/grokcli/releases/latest";
+
+/**
+ * Microsoft Store build (`VITE_GROK_STORE_BUILD=1`): the Store owns updates,
+ * so no GitHub/plugin checks run and Settings hides the update row.
+ */
+export const STORE_BUILD = import.meta.env.VITE_GROK_STORE_BUILD === "1";
 
 function toErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -683,6 +689,7 @@ export function useUpdater() {
   }, [closeUpdate, refreshChannelInfo, runUpdateCheck, setStatus]);
 
   useEffect(() => {
+    if (STORE_BUILD) return;
     aliveRef.current = true;
     const gen = ++generationRef.current;
     installDeveloperModeSimCleanup();
