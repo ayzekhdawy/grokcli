@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Grok",
+  "productName": "Grok Stable",
   "version": "0.2.41",
-  "identifier": "com.grokapp.desktop",
+  "identifier": "com.noniux.grokapp",
   "build": {
     "beforeDevCommand": "pnpm dev:ui",
     "devUrl": "http://localhost:1421",
