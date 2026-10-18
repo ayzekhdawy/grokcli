@@ -43,6 +43,11 @@ import {
   shouldSettleBottomRebound,
   takeProgrammaticStickScroll,
 } from "@/lib/stickToBottom";
+import {
+  anchoredScrollTop,
+  DISCLOSURE_ANCHOR_HOLD_MS,
+  findDisclosureToggle,
+} from "@/lib/disclosureScrollAnchor";
 
 
 export type UseStickToBottomOptions = {
@@ -562,6 +567,52 @@ export function useStickToBottom(
       }
     };
 
+    // Disclosure toggles (tool / thinking / phase chevrons): the body's
+    // height change must not be "followed" — pinned follow snapped to the
+    // new bottom and the clicked row flew away. Opening details is a read
+    // intent: drop the pin and hold the clicked header at its viewport
+    // position while the body (and any virtual remeasure) settles.
+    let anchorRaf: number | null = null;
+    const stopAnchor = () => {
+      if (anchorRaf != null) {
+        cancelAnimationFrame(anchorRaf);
+        anchorRaf = null;
+      }
+    };
+    const onClickCapture = (e: MouseEvent) => {
+      const toggle = findDisclosureToggle(e.target, el);
+      if (!toggle) return;
+      stopAnchor();
+      clearBottomRebound();
+      userIntentDownRef.current = false;
+      if (isPinnedRef.current) {
+        escapedRef.current = true;
+        isPinnedRef.current = false;
+        syncShowBack();
+      }
+      const relTop = () =>
+        toggle.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      const atClick = relTop();
+      const until = performance.now() + DISCLOSURE_ANCHOR_HOLD_MS;
+      const tick = () => {
+        anchorRaf = null;
+        if (!toggle.isConnected) return;
+        const next = anchoredScrollTop({
+          scrollTop: el.scrollTop,
+          anchorTopAtClick: atClick,
+          anchorTopNow: relTop(),
+          maxScrollTop: bottomScrollTop(el.scrollHeight, el.clientHeight),
+        });
+        if (Math.abs(next - el.scrollTop) >= 1) applyScrollTop(next);
+        if (performance.now() < until) anchorRaf = requestAnimationFrame(tick);
+      };
+      anchorRaf = requestAnimationFrame(tick);
+    };
+    el.addEventListener("click", onClickCapture, { capture: true });
+    // Any real user scroll gesture ends the hold immediately.
+    el.addEventListener("wheel", stopAnchor, { passive: true });
+    el.addEventListener("touchstart", stopAnchor, { passive: true });
+
     el.addEventListener("scroll", handleScroll, { passive: true });
     // Non-passive: at the locked bottom we preventDefault downward
     // overscroll so WKWebView cannot rubber-band the last lines under
@@ -577,6 +628,10 @@ export function useStickToBottom(
 
     return () => {
       el.removeEventListener("scroll", handleScroll);
+      stopAnchor();
+      el.removeEventListener("click", onClickCapture, { capture: true });
+      el.removeEventListener("wheel", stopAnchor);
+      el.removeEventListener("touchstart", stopAnchor);
       el.removeEventListener("wheel", handleWheel);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);

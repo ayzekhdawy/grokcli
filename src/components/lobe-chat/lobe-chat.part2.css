@@ -84,14 +84,16 @@
   max-height: min(70vh, 40rem);
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* auto: chain to the transcript at the edges (contain trapped the wheel). */
+  overscroll-behavior: auto;
   min-height: 0;
 }
 .grok-act__steps--virtual {
   max-height: 648px; /* fallback; inline style sets min(18, n) * 36 */
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* auto: chain to the transcript at the edges (contain trapped the wheel). */
+  overscroll-behavior: auto;
   min-height: 0;
 }
 .grok-act__steps--virtual .grok-act__step {
@@ -380,7 +382,8 @@
   margin: 2px 0 4px;
   max-height: 160px;
   overflow: auto;
-  overscroll-behavior: contain;
+  /* auto: chain to the transcript at the edges (contain trapped the wheel). */
+  overscroll-behavior: auto;
 }
 .lobe-timeline-tool__detail {
   margin: 0;
@@ -416,7 +419,8 @@
   margin: 0;
   max-width: 100%;
   overflow: auto;
-  overscroll-behavior: contain;
+  /* auto: chain to the transcript at the edges (contain trapped the wheel). */
+  overscroll-behavior: auto;
   white-space: pre-wrap;
   word-break: break-word;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -510,7 +514,8 @@
   border-left: 2px solid var(--chat-border, rgb(255 255 255 / 8%));
   max-height: 240px;
   overflow: auto;
-  overscroll-behavior: contain;
+  /* auto: chain to the transcript at the edges (contain trapped the wheel). */
+  overscroll-behavior: auto;
   color: var(--chat-text-3);
   font-size: 12.5px;
   line-height: 1.5;
@@ -605,7 +610,8 @@
   padding: 0 0 2px;
   max-height: min(32vh, 220px);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* auto: chain to the transcript at the edges (contain trapped the wheel). */
+  overscroll-behavior: auto;
   color: color-mix(in srgb, var(--chat-text-3, #9ca3af) 95%, transparent);
   font-size: 12.5px;
   line-height: 1.5;
@@ -720,3 +726,10 @@
   border-top: 1px solid color-mix(in srgb, var(--chat-border, #888) 28%, transparent);
 }
 /* Error state: no loud chrome — only red step dots / title count */
+
+/* One scroller per dig-in: tool detail inside an already-capped phase
+   expand body must not add a second nested scroll box. */
+.grok-act__expand-body .lobe-timeline-tool__detail {
+  max-height: none;
+  overflow: visible;
+}
