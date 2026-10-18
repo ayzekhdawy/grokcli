@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GrokCLI",
-  "version": "0.2.41",
+  "version": "0.2.42",
   "identifier": "com.noniux.grokcli",
   "build": {
     "beforeDevCommand": "pnpm dev:ui",

@@ -13,7 +13,11 @@ See `docs/llm-wiki/release.md`.
 
 ## [Unreleased]
 
+## [0.2.42] - 2026-10-18
+
 ### Fixed
+- Chat no longer jumps when you expand a tool or thinking row. Expanding a row pauses auto-follow so the row stays in place.
+- Scrolling works over expanded details. Nested scrollers hand the wheel back to the transcript at their edge.
 - Sandbox can start a chat again. The sealed home copies its config and bundled files instead of linking them.
 - A custom channel stays on its own server when a model allowlist is already set. A refusal is shown instead of silently using another provider.
 
