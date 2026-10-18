@@ -151,7 +151,8 @@ describe("thoughtBodyFollow", () => {
     );
     expect(css).toMatch(/\.grok-act__thought-body\s*\{[^}]*max-height:\s*240px/s);
     expect(css).toMatch(
-      /\.grok-thought__body\s*\{[^}]*overscroll-behavior:\s*contain/s,
+      // auto, not contain: contain trapped the wheel and broke outer scroll.
+      /\.grok-thought__body\s*\{[^}]*overscroll-behavior:\s*auto/s,
     );
   });
 });
