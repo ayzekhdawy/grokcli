@@ -25,8 +25,15 @@ GrokCLI, bilgisayarındaki `grok` komut satırı ajanını kullanan bir masaüst
   - ana pencereyi açmadan Onayla, Reddet ve Durdur
   - en fazla 12 kayıtlı prompt
   - genel kısayol `Alt+Win+P`
+- **PointHand ile bilgisayar kullanımı (Windows):** Tek tıkla [PointHand](https://github.com/ayzekhdawy/pointhand) MCP sunucusunu doldurur ve skill'ini kurar; ajan ekranı görüp masaüstü uygulamalarında çalışabilir. Ayrıntılar: [docs/pointhand.tr.md](docs/pointhand.tr.md).
 - **Tam Türkçe arayüz**, İngilizce de var.
 - **Kararlılık:** Pencere ve IPC işlemleri arayüzü kilitlemez, bağlantı kilidi takılırsa kendini toparlar ve donmalara karşı koruma testleri vardır.
+
+## PointHand: ajana Windows'ta bir el ver
+
+<p align="center"><img src="docs/pointhand/architecture.svg" alt="İllüstrasyon: Grok App → Grok CLI → PointHand MCP → Windows" width="760"></p>
+
+[PointHand](https://github.com/ayzekhdawy/pointhand), açık kaynak bir Windows bilgisayar kullanımı MCP sunucusudur. **Ayarlar → Eklentiler → MCP → Sunucu ekle**'de **PointHand'i doldur**'a tıkla, yolu çıkardığın `client/dist/index.js` olarak ayarla ve **Ekle**'ye bas. **PointHand skill'ini kur**, ajana bak → yap → doğrula akışını öğretir. Fiziksel Escape tuşu onu her an durdurur. Rehberin tamamı: [docs/pointhand.tr.md](docs/pointhand.tr.md).
 
 ## Kurulum
 

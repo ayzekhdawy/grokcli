@@ -28,6 +28,7 @@ GrokCLI is a desktop app (Tauri 2 + WebView2) that runs on top of the `grok` com
   - Approve, Deny and Stop actions without opening the main window
   - up to 12 saved prompts
   - global hotkey `Alt+Win+P`
+- **PointHand computer use (Windows):** one click fills the [PointHand](https://github.com/ayzekhdawy/pointhand) MCP server and installs its skill, so the agent can see the screen and work in desktop apps. See [docs/pointhand.md](docs/pointhand.md).
 - **Full Turkish UI**, alongside English.
 - **Stability work:** non-blocking window and IPC handling, a recovering connect lock, and guard tests against UI freezes.
 
@@ -36,6 +37,16 @@ GrokCLI is a desktop app (Tauri 2 + WebView2) that runs on top of the `grok` com
 | Welcome | Settings | Floating pet |
 | --- | --- | --- |
 | ![Welcome](docs/screenshots/welcome.png) | ![Settings](docs/screenshots/settings.png) | ![Pet](docs/screenshots/pet.png) |
+
+## PointHand: give the agent a hand on Windows
+
+<p align="center"><img src="docs/pointhand/architecture.svg" alt="Illustration: Grok App → Grok CLI → PointHand MCP → Windows" width="760"></p>
+
+[PointHand](https://github.com/ayzekhdawy/pointhand) is an open-source Windows computer-use MCP server. In **Settings → Extensions → MCP → Add server**, click **Fill in PointHand**, point it at your extracted `client/dist/index.js` and press **Add**. **Install PointHand skill** teaches the agent the look → act → verify workflow. Physical Escape stops it at any time. Full guide: [docs/pointhand.md](docs/pointhand.md).
+
+| Drawn in Paint by PointHand (real output) | Activity overlay (from the PointHand repo) |
+| :---: | :---: |
+| <img src="docs/pointhand/mona-lisa-result.png" alt="Mona Lisa drawn in Paint by PointHand" width="200"> | <img src="docs/pointhand/overlay-preview.png" alt="PointHand overlay" width="380"> |
 
 ## Install
 
